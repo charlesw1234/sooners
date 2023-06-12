@@ -3,7 +3,6 @@ from readline import set_completer
 from typing import Iterable
 from xml.dom.minidom import Element
 from sqlalchemy import MetaData as SAMetaData
-from ..utils import BaseHasher
 from .operations import BaseOperation
 
 class AnswerError(Exception): pass
@@ -153,23 +152,18 @@ class SNVersionMixin(SNBaseMixin):
                 yield subobj
 
     @classmethod
-    def save_to_xmlele(cls, xmlele: Element, objgroup: tuple[SNBaseMixin],
-                       hasher: BaseHasher, **kwargs) -> Element:
+    def save_to_xmlele(cls, xmlele: Element,
+                       objgroup: tuple[SNBaseMixin], **kwargs) -> Element:
         assert(xmlele.nodeName == cls.__name__)
         assert(all(map(lambda obj: isinstance(obj, cls), objgroup)))
-        hasher.update(cls.save_to_xmlele_open(xmlele, objgroup, **kwargs))
+        cls.save_to_xmlele_open(xmlele, objgroup, **kwargs)
         subobjs = objgroup[0].generate_subobjs(**kwargs)
         for subobjgroup in objgroup[0].generate_subobj_groups(*subobjs):
             subcls = subobjgroup[0].__class__
             subxmlele = xmlele.ownerDocument.createElement(subcls.__name__)
             xmlele.appendChild(subxmlele)
-            subcls.save_to_xmlele(subxmlele, subobjgroup, hasher, **kwargs)
-        hasher.update(cls.save_to_xmlele_close(xmlele, objgroup, **kwargs))
+            subcls.save_to_xmlele(subxmlele, subobjgroup, **kwargs)
         return xmlele
-    @classmethod
-    def save_to_xmlele_close(cls, xmlele: Element,
-                             objgroup: tuple[SNBaseMixin], **kwargs) -> str:
-        return ''
 
     def generate_subobj_groups(
             self, *subobjs: list[SNBaseMixin]) -> Iterable[list[SNBaseMixin]]:

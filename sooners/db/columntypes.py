@@ -34,7 +34,7 @@ class ColumnTypeMixin(object):
 
     def save_to_attrs(self) -> Iterable[tuple[str, str]]:
         yield ('type', self.__class__.__name__)
-    def save_to_subeles(self, xmlele: Element) -> str: return ''
+    def save_to_subeles(self, xmlele: Element) -> None: pass
     def format(self, value: object) -> str: return repr(value)
     def parse(self, text: str) -> object: raise NotImplemented
     def equal(self, other) -> bool: return type(self) is type(other)
@@ -99,17 +99,13 @@ class Enum(SAEnum, ColumnTypeMixin):
     def save_to_attrs(self) -> Iterable[tuple[str, str]]:
         for attr in super().save_to_attrs(): yield attr
         yield ('enum_name', self.name)
-    def save_to_subeles(self, xmlele: Element) -> str:
-        xmlstrs = []
+    def save_to_subeles(self, xmlele: Element) -> None:
         func = lambda enum_value: enum_value.value
         for enum_value in sorted(self.enum_class.__members__.values(), key = func):
             subxmlele = xmlele.ownerDocument.createElement('EnumValue')
             subxmlele.setAttribute('name', enum_value.name)
             subxmlele.setAttribute('value', repr(enum_value.value))
             xmlele.appendChild(subxmlele)
-            xmlstrs.append('<EnumValue name=%r value=%r/>' %
-                           (enum_value.name, repr(enum_value.value)))
-        return ''.join(xmlstrs)
     def format(self, value: PyEnum) -> str: return value.name
     def parse(self, text: str) -> PyEnum: return self.enum_class.__members__[text]
     def equal(self, other) -> bool:

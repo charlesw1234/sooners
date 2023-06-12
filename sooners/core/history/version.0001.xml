@@ -1,10 +1,9 @@
 <?xml version="1.0" ?>
-<MetaData checksum="QMjymK_AowN-Ge5x0spx3ft4ghNxsgpCv-ZCHQiCoc9KsdEeHPGaf7gLvPO7BLVr" sooners="sooners-00.00" component="sooners_core" version="0001">
+<MetaData checksum="Vav6GUS1wSdsZltlEcBJzzj18YOw0PPjJRKgCvatY4-aOZAY5LogJUbjJ6BuamR6" sooners="sooners-00.00" component="sooners_core" version="0001">
   <Table name="sooners_batch_weight">
     <Column name="batch_name" type="String" length="64" primary_key="True"/>
     <Column name="batch_suffix" type="String" length="32" nullable="False"/>
     <Column name="weight" type="BigInteger" nullable="False"/>
-    <PrimaryKeyConstraint/>
   </Table>
   <Table name="sooners_configuration">
     <Column name="id" type="Integer" primary_key="True" default="0"/>
@@ -14,7 +13,6 @@
     </Column>
     <Column name="conf_part_order" type="Integer" nullable="False"/>
     <Column name="conf_part" type="String" length="64" nullable="False"/>
-    <PrimaryKeyConstraint/>
   </Table>
   <Table name="sooners_dbschema_operation">
     <Column name="id" type="Integer" primary_key="True" default="0"/>
@@ -22,7 +20,6 @@
     <Column name="typeid" type="Integer" nullable="False"/>
     <Column name="name0" type="String" length="64"/>
     <Column name="name1" type="String" length="64"/>
-    <PrimaryKeyConstraint/>
   </Table>
   <Table name="sooners_dbschema_version">
     <Column name="component_name" type="String" length="64" primary_key="True"/>
@@ -32,6 +29,5 @@
     <Column name="index1" type="Integer" nullable="False" default="0"/>
     <Column name="version1" type="Integer"/>
     <Column name="checksum1" type="String" length="64"/>
-    <PrimaryKeyConstraint/>
   </Table>
 </MetaData>

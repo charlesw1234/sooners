@@ -6,23 +6,13 @@ from hashlib import sha3_384
 from pathlib import Path
 from xml.dom.minidom import Element
 
-class BaseHasher(object):
-    def __init__(self, hasher: HASH = None):
-        self.hasher, self.bodies = hasher, []
-    def body(self) -> str: return ''.join(self.bodies)
-    def update(self, body: str) -> str:
-        self.bodies.append(body)
-        if self.hasher is not None: self.hasher.update(body.encode('utf-8'))
-        return body
-    def b64digest(self) -> str:
-        if self.hasher is None: return ''
-        return urlsafe_b64encode(self.hasher.digest()).decode('ascii')
-
-class Hasher(BaseHasher):
+class Hasher(object):
     checksum_class = sha3_384
     checksum_size = len(urlsafe_b64encode(checksum_class().digest()).decode('ascii'))
-    def __init__(self):
-        super().__init__(self.checksum_class())
+    def __init__(self, body: str) -> None:
+        self.hasher = self.checksum_class(body.encode('utf-8'))
+    def b64digest(self) -> str:
+        return urlsafe_b64encode(self.hasher.digest()).decode('ascii')
 
 class Context(object):
     def __init__(self, **name2values: dict[str, object]) -> None:

@@ -85,14 +85,10 @@ class ModelCatalogue(object):
 
 class MetaData(BaseMetaData):
     @classmethod
-    def save_to_xmlele_open(cls, xmlele: Element, objgroup: tuple[SNBaseMixin],
-                            component = None, **kwargs) -> str:
+    def save_to_xmlele_open(cls, xmlele: Element,
+                            objgroup: tuple[SNBaseMixin],
+                            component = None, **kwargs) -> None:
         assert(len(objgroup) == 1)
-        return '<%s>' % (cls.__name__,)
-    @classmethod
-    def save_to_xmlele_close(cls, xmlele: Element,
-                             objgroup: tuple[SNBaseMixin], **kwargs) -> str:
-        return '</%s>' % (cls.__name__,)
 
     def __init__(self, settings, *args, **kwargs):
         super().__init__(settings, *args, **kwargs)
@@ -101,10 +97,10 @@ class MetaData(BaseMetaData):
 
     def make_version(self, component: BaseComponent) -> Element | None:
         xmlele = getDOMImplementation().createDocument(None, 'MetaData', None).documentElement
-        self.save_to_xmlele(xmlele, (self,), hasher := Hasher(), component = component)
+        self.save_to_xmlele(xmlele, (self,), component = component)
         func = lambda subxmlnode: subxmlnode.nodeType is subxmlnode.ELEMENT_NODE
-        if len(tuple(filter(func, xmlele.childNodes))) == 0: return None
-        xmlele.setAttribute('checksum', hasher.b64digest())
+        if not any(map(func, xmlele.childNodes)): return None
+        xmlele.setAttribute('checksum', Hasher(xmlele.toxml()).b64digest())
         return xmlele
 
     def save_params(self, params: Context) -> Context:

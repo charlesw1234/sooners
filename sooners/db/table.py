@@ -32,15 +32,13 @@ class ForeignKey(SAForeignKey):
             kwargs.update(ondelete = xmlele.getAttribute('ondelete'))
         return cls(column, **kwargs)
 
-    def save_to_subeles(self, xmlele: Element) -> str:
+    def save_to_subeles(self, xmlele: Element) -> None:
         xmlele.appendChild(subxmlele := xmlele.ownerDocument.createElement('ForeignKey'))
         attrs = [('column', self.target_fullname)]
         if self.name is not None: attrs.append(('name', self.name))
         if self.onupdate is not None: attrs.append(('onupdate', self.onupdate))
         if self.ondelete is not None: attrs.append(('ondelete', self.ondelete))
         tuple(map(lambda attr: subxmlele.setAttribute(attr[0], attr[1]), attrs))
-        func = lambda attr: '%s="%s"' % attr
-        return '<ForeignKey %s/>' % ' '.join(map(func, attrs))
 SA2SN.register(ForeignKey)
 
 class Column(SAColumn, SNVersionMixin, SNPatchMixin):
@@ -59,7 +57,7 @@ class Column(SAColumn, SNVersionMixin, SNPatchMixin):
         yield arguments(cls)
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[ColumnTypeMixin], **kwargs) -> str:
+                            objgroup: tuple[ColumnTypeMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
         column = objgroup[0]
         attrs = [('name', column.name)]
@@ -72,23 +70,11 @@ class Column(SAColumn, SNVersionMixin, SNPatchMixin):
             assert(column.default.is_scalar) # support scalar now.
             attrs.append(('default', column.type.format(column.default.arg)))
         for attrname, attrvalue in attrs: xmlele.setAttribute(attrname, attrvalue)
-        func = lambda attr: '%s="%s"' % attr
-        attrs_str = ' '.join(map(func, attrs))
-        subeles_str0 = column.type.save_to_subeles(xmlele)
-        subeles_str1 = ''.join(
-            map(lambda foreign_key: foreign_key.save_to_subeles(xmlele),
-                map(lambda foreign_key: SA2SN.cast(foreign_key),
-                    sorted(column.foreign_keys,
-                           key = lambda foreign_key: foreign_key.target_fullname))))
-        subeles_str = subeles_str0 + subeles_str1
-        if not subeles_str: return '<%s name="%s"/>' % (cls.__name__, attrs_str)
-        else: return '<%s name="%s">%s' % (cls.__name__, attrs_str, subeles_str)
-    @classmethod
-    def save_to_xmlele_close(cls, xmlele: Element,
-                             objgroup: tuple[ColumnTypeMixin], **kwargs) -> str:
-        column = objgroup[0]
-        if not column.foreign_keys: return ''
-        else: return '<%s>' % (cls.__name__,)
+        column.type.save_to_subeles(xmlele)
+        tuple(map(lambda foreign_key: foreign_key.save_to_subeles(xmlele),
+                  map(lambda foreign_key: SA2SN.cast(foreign_key),
+                      sorted(column.foreign_keys,
+                             key = lambda foreign_key: foreign_key.target_fullname))))
 
     @classmethod
     def patch_forward_create(cls, xmlpatch: Element, table: SATable,
@@ -146,9 +132,8 @@ class PrimaryKeyConstraint(SAPrimaryKeyConstraint, SNVersionMixin, SNPatchMixin)
         pass # fixme.
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[SNBaseMixin], **kwargs) -> str:
+                            objgroup: tuple[SNBaseMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
-        return '<%s/>' % cls.__name__ # fixme.
     # add patch_forward_create/patch_forward/patch_forward_rename/patch_forward_drop here.
     # add patch_backward_create/patch_backward/patch_backward_rename/patch_backward_drop here.
 SA2SN.register(PrimaryKeyConstraint)
@@ -159,9 +144,8 @@ class ForeignKeyConstraint(SAForeignKeyConstraint, SNVersionMixin, SNPatchMixin)
         pass # fixme.
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[SNBaseMixin], **kwargs) -> str:
-        # fixme:...
-        return '<%s/>' % cls.__name__ # fixme.
+                            objgroup: tuple[SNBaseMixin], **kwargs) -> None:
+        pass # fixme:...
     # add patch_forward_create/patch_forward/patch_forward_rename/patch_forward_drop here.
     # add patch_backward_create/patch_backward/patch_backward_rename/patch_backward_drop here.
 SA2SN.register(ForeignKeyConstraint)
@@ -172,9 +156,8 @@ class UniqueConstraint(SAUniqueConstraint, SNVersionMixin, SNPatchMixin):
         pass # fixme.
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[SNBaseMixin], **kwargs) -> str:
+                            objgroup: tuple[SNBaseMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
-        return '<%s/>' % cls.__name__ # fixme.
     # add patch_forward_create/patch_forward/patch_forward_rename/patch_forward_drop here.
     # add patch_backward_create/patch_backward/patch_backward_rename/patch_backward_drop here.
 SA2SN.register(UniqueConstraint)
@@ -185,9 +168,8 @@ class CheckConstraint(SACheckConstraint, SNVersionMixin, SNPatchMixin):
         pass # fixme.
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[SNBaseMixin], **kwargs) -> str:
+                            objgroup: tuple[SNBaseMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
-        return '<%s/>' % cls.__name__ # fixme.
     # add patch_forward_create/patch_forward/patch_forward_rename/patch_forward_drop here.
     # add patch_backward_create/patch_backward/patch_backward_rename/patch_backward_drop here.
 SA2SN.register(CheckConstraint)
@@ -198,9 +180,9 @@ class Index(SAIndex, SNVersionMixin, SNPatchMixin):
         pass # fixme.
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
-                            objgroup: tuple[SNBaseMixin], **kwargs) -> str:
+                            objgroup: tuple[SNBaseMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
-        return '<%s/>' % cls.__name__ # fixme.
+        pass # fixme.
 
     @classmethod
     def patch_forward_create(cls, xmlpatch: Element, table: SATable,
@@ -256,11 +238,9 @@ class BaseTable(SATable, SNVersionMixin, SNPatchMixin):
     __sub_version_types__ = dict()
     __sub_patch_create_types__, __sub_patch_types__ = dict(), dict()
     __sub_patch_rename_types__, __sub_patch_drop_types__ = dict(), dict()
-    @classmethod
-    def save_to_xmlele_close(cls, xmlele: Element,
-                             objgroup: tuple[SNBaseMixin | ColumnTypeMixin],
-                             **kwargs) -> str:
-        return '</%s>' % (cls.__name__,)
+    __constraint_priority__ = {
+        'PrimaryKeyConstraint': 1, 'ForeignKeyConstraint': 2,
+        'UniqueConstraint': 3, 'CheckConstraint': 4 }
     def __new__(cls, *args, database_names: set[str] = None, component = None, **kwargs):
         table = super().__new__(cls, *args, **kwargs)
         table.__database_names__ = database_names
@@ -274,7 +254,11 @@ class BaseTable(SATable, SNVersionMixin, SNPatchMixin):
             [repr(self.metadata), *map(lambda column: repr(column), self.columns),
              *map(lambda k: '%s=%s' % (k, repr(getattr(self, k))), ['schema'])]))
     def generate_subobjs(self, **kwargs) -> tuple[object]:
-        return (*self.columns, *self.constraints, *self.indexes)
+        func0 = lambda constraint: len(constraint.columns) > 1
+        func1 = lambda constraint: self.__constraint_priority__[constraint.__class__.__name__]
+        return (*self.columns,
+                *sorted(filter(func0, self.constraints), key = func1),
+                *self.indexes)
 BaseTable.register_subtypes(Column, PrimaryKeyConstraint, ForeignKeyConstraint,
                             UniqueConstraint, CheckConstraint, Index)
 
@@ -289,10 +273,9 @@ class Table(BaseTable):
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
                             objgroup: tuple[SNBaseMixin | ColumnTypeMixin],
-                            **kwargs) -> str:
+                            **kwargs) -> None:
         assert(len(objgroup) == 1)
         xmlele.setAttribute('name', objgroup[0].name)
-        return '<%s name="%s">' % (cls.__name__, objgroup[0].name)
     @classmethod
     def save_params(cls, params: Context,
                     objgroup: tuple[SNBaseMixin | ColumnTypeMixin]) -> Context:
@@ -416,9 +399,8 @@ class BatchTable(BaseTable):
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
                             objgroup: tuple[SNBaseMixin | ColumnTypeMixin],
-                            **kwargs) -> str:
+                            **kwargs) -> None:
         xmlele.setAttribute('name', objgroup[0].name)
-        return '<%s name="%s"/>' % (cls.__name__, objgroup[0].name)
     @classmethod
     def save_params(cls, params: Context, objgroup: tuple[SNBaseMixin]) -> Context:
         self_params = Context(database_names = dict())
