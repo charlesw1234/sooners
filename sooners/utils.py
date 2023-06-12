@@ -1,7 +1,6 @@
 from base64 import urlsafe_b64encode
 from collections import OrderedDict
 from datetime import date, datetime, timedelta
-from _hashlib import HASH
 from hashlib import sha3_384
 from pathlib import Path
 from xml.dom.minidom import Element
