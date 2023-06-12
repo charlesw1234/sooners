@@ -1,0 +1,12 @@
+uvicorn
+gunicorn
+fastapi
+sqlalchemy
+alembic
+aiosqlite
+mysqlclient
+aiomysql
+asyncmy
+psycopg
+asyncpg
+setproctitle

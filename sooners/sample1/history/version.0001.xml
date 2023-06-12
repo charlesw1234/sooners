@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+<MetaData checksum="N2yom1_nAj2tpUwHeqeumQrs-mtweK-Cho4k7z9OELrJqCdO0PCrQon8-um5nbdp" sooners="sooners-00.00" component="sooners_sample1" version="0001">
+  <Table name="sample1_building">
+    <Column name="id" type="Integer" primary_key="True" default="0"/>
+    <Column name="name" type="String" length="32" nullable="False"/>
+    <PrimaryKeyConstraint/>
+  </Table>
+  <Table name="sample1_floor">
+    <Column name="id" type="Integer" primary_key="True" default="0"/>
+    <Column name="name" type="String" length="32" nullable="False"/>
+    <Column name="building_id" type="Integer" nullable="False">
+      <ForeignKey column="sample1_building.id" ondelete="CASCADE"/>
+    </Column>
+    <ForeignKeyConstraint/>
+    <PrimaryKeyConstraint/>
+  </Table>
+  <BatchTable name="sample1_point">
+    <Column name="id" type="Integer" primary_key="True" default="0"/>
+    <Column name="name" type="String" length="32" nullable="False"/>
+    <Column name="building_id" type="Integer" nullable="False">
+      <ForeignKey column="sample1_building.id" ondelete="CASCADE"/>
+    </Column>
+    <Column name="floor_id" type="Integer" nullable="False">
+      <ForeignKey column="sample1_floor.id" ondelete="CASCADE"/>
+    </Column>
+    <PrimaryKeyConstraint/>
+    <ForeignKeyConstraint/>
+  </BatchTable>
+</MetaData>
