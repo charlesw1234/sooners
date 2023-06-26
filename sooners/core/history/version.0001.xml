@@ -1,12 +1,12 @@
 <?xml version="1.0" ?>
-<MetaData checksum="Vav6GUS1wSdsZltlEcBJzzj18YOw0PPjJRKgCvatY4-aOZAY5LogJUbjJ6BuamR6" sooners="sooners-00.00" component="sooners_core" version="0001">
+<MetaData checksum="94OzyiWAwbCFrpacLuHW9jPjSVK3gjyQ4cqKkQaum8TQ5aTARCMj3NlLCiBR1Jkq" sooners="sooners-00.00" component="sooners_core" version="0001">
   <Table name="sooners_batch_weight">
     <Column name="batch_name" type="String" length="64" primary_key="True"/>
     <Column name="batch_suffix" type="String" length="32" nullable="False"/>
     <Column name="weight" type="BigInteger" nullable="False"/>
   </Table>
   <Table name="sooners_configuration">
-    <Column name="id" type="Integer" primary_key="True" default="0"/>
+    <Column name="id" type="Integer" primary_key="True"/>
     <Column name="conf_type" type="Enum" enum_name="sooners_conf_type" nullable="False">
       <EnumValue name="SCHEMA_PARAMS_0" value="0"/>
       <EnumValue name="SCHEMA_PARAMS_1" value="1"/>
@@ -15,9 +15,10 @@
     <Column name="conf_part" type="String" length="64" nullable="False"/>
   </Table>
   <Table name="sooners_dbschema_operation">
-    <Column name="id" type="Integer" primary_key="True" default="0"/>
+    <Column name="id" type="Integer" primary_key="True"/>
     <Column name="component_name" type="String" length="64" nullable="False"/>
     <Column name="typeid" type="Integer" nullable="False"/>
+    <Column name="table" type="String" length="64"/>
     <Column name="name0" type="String" length="64"/>
     <Column name="name1" type="String" length="64"/>
   </Table>
