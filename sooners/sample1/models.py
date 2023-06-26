@@ -26,3 +26,4 @@ class Point(BaseBatchModel):
     name: Mapped[name_column]
     building_id: Mapped[int] = mapped_column(nullable = True)
     floor_id: Mapped[int] = mapped_column(nullable = True)
+    point_type: Mapped[int] = mapped_column(nullable = True)

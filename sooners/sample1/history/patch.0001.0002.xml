@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<Patch sooners="sooners-00.00" component="sooners_sample1" version0="0001" version1="0002">
+  <Table name="sample1_floor">
+    <Column name="id"/>
+    <Column name="building_id"/>
+    <Column name="name"/>
+  </Table>
+  <Table name="sample1_building">
+    <Column name="id"/>
+    <Column name="name"/>
+  </Table>
+  <BatchTable name="sample1_point">
+    <ColumnCreate name="point_type"/>
+    <Column name="floor_id"/>
+    <Column name="id"/>
+    <Column name="building_id"/>
+    <Column name="name"/>
+  </BatchTable>
+</Patch>
