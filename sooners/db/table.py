@@ -61,6 +61,7 @@ class Column(SAColumn, SNVersionMixin, SNPatchMixin):
         assert(len(objgroup) == 1)
         column = objgroup[0]
         attrs = [('name', column.name)]
+        column.type = SA2SN.cast(column.type)
         attrs.extend(list(column.type.save_to_attrs()))
         if column.primary_key: attrs.append(('primary_key', 'True'))
         elif column.unique: attrs.append(('unique', 'True'))
@@ -266,8 +267,8 @@ class Table(BaseTable):
     @classmethod
     def new_from_xmlele(cls, xmlele: Element, metadata: SAMetaData) -> Iterable:
         table_name = xmlele.getAttribute('name')
-        database_names = metadata.params.get(table_name, {}).get(
-            'database_names', metadata.settings.default_database_names)
+        database_names = metadata.params.get_one(table_name, {}).get_one(
+            'database_names', { metadata.settings.default_database_name })
         yield cls(table_name, metadata, database_names = database_names,
                   *cls.load_subobjs_from_xmlele(xmlele, metadata))
     @classmethod
@@ -361,7 +362,7 @@ class Table(BaseTable):
                 yield DropTable(database_name, table1)
             else:
                 for operation in cls.do_backward(
-                        xmlpatch, table1, table0, datbase_name = database_name):
+                        xmlpatch, table1, table0, database_name = database_name):
                     yield operation
     @classmethod
     def patch_backward_rename(cls, xmlpatch: Element,
@@ -390,7 +391,8 @@ class BatchTable(BaseTable):
     @classmethod
     def new_from_xmlele(cls, xmlele: Element, metadata: SAMetaData) -> Iterable:
         batch_name = xmlele.getAttribute('name')
-        for dbname, suffixes in metadata.params[batch_name]['database_names'].items():
+        dbname2suffixes = metadata.params.get_one(batch_name, {}).get_one('database_names', {})
+        for dbname, suffixes in dbname2suffixes.items():
             for batch_suffix in suffixes:
                 yield cls('%s_%s' % (batch_name, batch_suffix),
                           metadata, database_names = { dbname },
@@ -404,13 +406,15 @@ class BatchTable(BaseTable):
     @classmethod
     def save_params(cls, params: Context, objgroup: tuple[SNBaseMixin]) -> Context:
         self_params = Context(database_names = dict())
-        for dbname in set().union(*map(lambda obj: obj.__database_names__, objgroup)):
+        func0 = lambda obj: obj.__database_names__
+        func1 = lambda database_names: database_names is not None
+        for dbname in set().union(*filter(func1, map(func0, objgroup))):
             func0 = lambda obj: dbname in obj.__database_names__
             func1 = lambda obj: obj.__batch_suffix__
             suffixes = sorted(map(func1, filter(func0, objgroup)))
             self_params.database_names[dbname] = suffixes
-        params.update(**{ objgroup[0].__batch_name__: self_params })
-        return params
+        if not self_params.database_names: return params
+        return params.set_one(objgroup[0].__batch_name__, self_params)
 
     def __new__(cls, *args, batch_name: str | None = None,
                 batch_suffix: str | None = None, **kwargs):

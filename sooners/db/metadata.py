@@ -29,12 +29,12 @@ def make_patch(xmlversion0: Element, xmlversion1: Element, prompt: callable) -> 
 
 class MetaDataSaved(BaseMetaData):
     @classmethod
-    def versions2xmls(cls, settings, versions: dict[str, int]) -> dict[str, Element]:
+    def versions2xmls(cls, settings, versions: Context) -> Context:
         func0 = lambda n2v: n2v[0] in settings.components
         func1 = lambda n2v: (n2v[0], settings.components[n2v[0]].version_parse(n2v[1]))
         return dict(map(func1, filter(func0, versions.items())))
-    def __init__(self, settings, xmlversions: dict[str, Element],
-                 params: dict[str, object], *args, **kwargs) -> None:
+    def __init__(self, settings, xmlversions: Context,
+                 params: Context, *args, **kwargs) -> None:
         super().__init__(settings, *args, **kwargs)
         self.params, self.components = params, dict()
         for name, xmlversion in xmlversions.items():
@@ -103,7 +103,8 @@ class MetaData(BaseMetaData):
         xmlele.setAttribute('checksum', Hasher(xmlele.toxml()).b64digest())
         return xmlele
 
-    def save_params(self, params: Context) -> Context:
+    def save_params(self, params: Context | None = None) -> Context:
+        if params is None: params = Context()
         for subobj_group in self.generate_subobj_groups(*self.sorted_tables):
             params = subobj_group[0].__class__.save_params(params, subobj_group)
         return params

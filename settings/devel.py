@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         self.databases.install_postgresql(
             'test0', 'sooners', 'sooners', '$abc123def$', default_db = True)
         self.databases.install_mysql('test1', 'sooners', 'sooners', '$abc123def$')
-        self.databases.install_sqlite3_at_dbs('test2', 'test1.sqlite3')
+        self.databases.install_sqlite3_at_dbs('test2', 'test2.sqlite3')
         index2suffix = lambda index: '%03u' % index
         self.model_params.update(Point = Context(batch_map = dict(
             test0 = tuple(map(index2suffix, range(0, 1))),

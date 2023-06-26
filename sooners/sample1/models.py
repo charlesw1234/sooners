@@ -11,22 +11,18 @@ class Building(BaseModel):
     id: Mapped[intpk]
     name: Mapped[name_column]
     floors: Mapped[list['Floor']] = relationship(
-        back_populates = 'sample1_floor', cascade = 'all, delete-orphan')
-building_id_column = Annotated[int, mapped_column(
-    ForeignKey(Building.id, ondelete = 'CASCADE'))]
+        back_populates = 'building', cascade = 'all, delete-orphan')
 
 class Floor(BaseModel):
     __tablename__ = 'sample1_floor'
     id: Mapped[intpk]
     name: Mapped[name_column]
-    building_id: Mapped[building_id_column]
-    building: Mapped[Building] = relationship(back_populates = 'sample1_building')
-floor_id_column = Annotated[int, mapped_column(
-    ForeignKey(Floor.id, ondelete = 'CASCADE'))]
+    building_id: Mapped[int] = mapped_column(ForeignKey(Building.id, ondelete = 'CASCADE'))
+    building: Mapped[Building] = relationship(back_populates = 'floors')
 
 class Point(BaseBatchModel):
     __tablename__ = 'sample1_point'
     id: Mapped[intpk]
     name: Mapped[name_column]
-    building_id: Mapped[building_id_column]
-    floor_id: Mapped[floor_id_column]
+    building_id: Mapped[int] = mapped_column(nullable = True)
+    floor_id: Mapped[int] = mapped_column(nullable = True)

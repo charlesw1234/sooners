@@ -29,10 +29,12 @@ class BaseOperation(object, metaclass = OperationMeta):
         if callable(getattr(self, 'post_operation', None)): self.post_operation(prompt, oper)
         oper.get_bind().commit()
         return result
+    def table_name(self) -> str | None: return None
     def names(self) -> tuple[str | None]:
         return (None if len(self.attrs) < 1 else getattr(self, self.attrs[0]).name,
                 None if len(self.attrs) < 2 else getattr(self, self.attrs[1]).name)
     def key(self) -> tuple[str | int | None]: return (self.typeid, *self.names())
+
 
 ColumnDict = dict[str, SAColumn]
 class CreateTable(BaseOperation):
@@ -111,12 +113,15 @@ class DropTable(BaseOperation):
         for column in filter(func, self.table.columns):
             column.type.post_operation(prompt, self.database_name, oper)
 
-class CreateColumn(BaseOperation):
+class ColumnOperationMixin(object):
+    def table_name(self) -> str | None: return self.column.table.name
+
+class CreateColumn(BaseOperation, ColumnOperationMixin):
     typeid, oper_member, attrs = 4, 'add_column', ('column',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.column.table.name, self.column)
 
-class AlterColumn(BaseOperation):
+class AlterColumn(BaseOperation, ColumnOperationMixin):
     typeid, oper_member, attrs = 5, 'alter_column', ('column0', 'column1')
     def check_arguments(self) -> bool: return bool(self._make_arguments0())
     def make_arguments(self, oper: Arguments) -> Arguments:
@@ -149,49 +154,55 @@ class AlterColumn(BaseOperation):
         elif isinstance(oper.impl, PostgresqlImpl): pass
         return arguments.prepend(self.column1.table.name, self.column0.name)
 
-class DropColumn(BaseOperation):
+class DropColumn(BaseOperation, ColumnOperationMixin):
     typeid, oper_member, attrs = 6, 'drop_column', ('column',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
-        return Arguments(self.column.table.name, self.column)
+        return Arguments(self.column.table.name, self.column.name)
     def post_operation(self, prompt: callable, oper: AlembicOperations) -> None:
-        if callable(getattr(column.type, 'post_operation', None)):
-            column.type.post_operation(prompt, self.database_name, oper)
+        if callable(getattr(self.column.type, 'post_operation', None)):
+            self.column.type.post_operation(prompt, self.database_name, oper)
 
-class CreatePrimaryKeyConstraint(BaseOperation):
+class ConstraintOperationMixin(object):
+    def table_name(self) -> str | None: return self.constraint.table.name
+
+class CreatePrimaryKeyConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 7, 'create_primary_key_constraint'
     # fixme.
-class DropPrimaryKeyConstraint(BaseOperation):
+class DropPrimaryKeyConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 8, 'drop_primary_key_constraint'
     # fixme
 
-class CreateForeignKeyConstraint(BaseOperation):
+class CreateForeignKeyConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 9, 'create_foreign_key_constraint'
     # fixme.
-class DropForeignKeyConstraint(BaseOperation):
+class DropForeignKeyConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 10, 'drop_foreign_key_constraint'
     # fixme.
 
-class CreateUniqueConstraint(BaseOperation):
+class CreateUniqueConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 11, 'create_unique_constraint'
     # fixme.
-class DropUniqueConstraint(BaseOperation):
+class DropUniqueConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 12, 'drop_unique_constraint'
     # fixme.
 
-class CreateCheckConstraint(BaseOperation):
+class CreateCheckConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 13, 'create_check_constraint'
     # fixme.
-class DropCheckConstraint(BaseOperation):
+class DropCheckConstraint(BaseOperation, ConstraintOperationMixin):
     typeid, oper_member = 14, 'drop_check_constraint'
     # fixme.
 
-class CreateIndex(BaseOperation):
+class IndexOperationMixin(object):
+    def table_name(self) -> str | None: return self.index.table.name
+
+class CreateIndex(BaseOperation, IndexOperationMixin):
     typeid, oper_member, attrs = 15, 'create_index', ('index',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.index.name, self.index.table.name,
                          self.index.columns, unique = self.index.unique)
 
-class DropIndex(BaseOperation):
+class DropIndex(BaseOperation, IndexOperationMixin):
     typeid, oper_member, attrs = 16, 'drop_index', ('index',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.index.name, self.index.table.name)

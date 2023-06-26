@@ -6,14 +6,12 @@ from ..db.metadata import MetaDataSaved
 from ..db.migration import Migration
 
 class DBSchemaStep(BaseMilestoneStep):
-    def __init__(self, versions: dict[str, int], params: dict[str, object]):
+    def __init__(self, versions: Context, params: Context):
         super().__init__()
         self.versions, self.params = versions, params
 
     def description(self):
-        func = lambda item: '%s=%r' % item
-        return '(%s)-(%s)' % (','.join(map(func, self.versions.items())),
-                              ','.join(map(func, self.params.items())))
+        return '(%r)-(%r)' % (repr(self.versions), repr(self.params))
 
     def setup_metadata1(self) -> MetaDataSaved:
         from ..settings import the_settings

@@ -8,7 +8,7 @@ from .columntypes import Integer
 from .table import Table, BatchTable
 
 intpk = Annotated[int, mapped_column(
-    Integer(), default = 0, primary_key = True, autoincrement = True)]
+    Integer(), primary_key = True, autoincrement = True)]
 #    init = False, default = 0, primary_key = True, autoincrement = True)]
 
 class DeclarativeMeta(DeclarativeBase.__class__):
@@ -56,22 +56,12 @@ class BaseModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
         if cls.__abstract__: return
         if hasattr(cls, '__database_names__'): return
         if not hasattr(cls, '__database_name_patterns__'):
-            cls.__database_names__ = the_settings.default_database_names
+            cls.__database_names__ = { the_settings.default_database_name }
         else:
             func = lambda database_name: any(map(
                 lambda pattern: fnmatch(database_name, pattern),
                 cls.__database_name_patterns__))
             cls.__database_names__ = set(filter(func, databases.keys()))
-
-class ModelClone(object):
-    def __init__(self, cls: type, bases: tuple[type],
-                 classdict: dict[str, object], **kwargs) -> None:
-        self.cls, self.bases = cls, bases
-        self.classdict, self.kwargs = classdict, kwargs
-    def __call__(self, classname: str, **classdict_updates) -> type:
-        classdict = self.classdict.copy()
-        classdict.update(**classdict_updates)
-        return self.cls.__class__(classname, self.bases, classdict, **self.kwargs)
 
 class BaseBatchModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
     registry, metadata = the_settings.registry, the_settings.metadata
@@ -83,7 +73,6 @@ class BaseBatchModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMet
             cls.metadata.models.batch_abstract[cls.__name__] = cls
         elif cls.__batch_suffix__ is None: # for batch models.
             cls.metadata.models.batch[cls.__name__] = cls
-            cls.__model_clone__ = ModelClone(cls, cls.__bases__, classdict, **kwargs)
             cls.__suffix2model__ = dict()
             cls.__model2database__ = dict()
             cls.__suffix2database__ = dict()
@@ -102,12 +91,15 @@ class BaseBatchModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMet
         if batch_suffix in set(cls.__suffix2model__.keys()):
             excfmt = 'Batch suffix conflict detected for %r at %r.'
             raise ValueError(excfmt % (cls, batch_suffix))
-        batch_entity_model = cls.__model_clone__(
-            cls.batch_modelname(batch_suffix),
-            __batch_name__ = cls.__name__, __batch_suffix__ = batch_suffix,
-            __tablename__ = cls.batch_tablename(batch_suffix),
-            __table_args__ = dict(
-                batch_name = cls.__tablename__, batch_suffix = batch_suffix))
+        batch_table = cls.__table__.to_metadata(
+            cls.metadata, name = cls.batch_tablename(batch_suffix))
+        batch_table.__class__ = BatchTable
+        batch_table.__batch_name__ = cls.__tablename__
+        batch_table.__batch_suffix__ = batch_suffix
+        batch_entity_model = type(
+            cls.batch_modelname(batch_suffix), cls.__bases__, dict(
+                __batch_name__ = cls.__name__, __batch_suffix__ = batch_suffix,
+                __table__ = batch_table))
         cls.__suffix2model__[batch_suffix] = batch_entity_model
         cls.__model2database__[batch_entity_model] = database
         cls.__suffix2database__[batch_suffix] = database

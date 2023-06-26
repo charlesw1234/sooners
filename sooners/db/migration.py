@@ -1,5 +1,5 @@
 from typing import Iterable
-from ..utils import Context, DefaultDict
+from ..utils import Context, DefaultDict, OrderedDict
 from ..component import BaseComponent
 from .operations import BaseOperation
 from .metadata import MetaDataSaved
@@ -15,16 +15,18 @@ class DBSchemaParams(object):
         text0, text1 = repr(self.params0_text), repr(self.params1_text)
         return '%s(%s,%s)' % (self.__class__.__name__, text0, text1)
     # fixme: it is dangerous to use repr/eval, may be reimplement in another way.
-    def params0(self) -> dict[str, object]:
-        return None if self.params0_text is None else eval(self.params0_text)
-    def save_params0(self, params0: dict[str, object] | None = None) -> None:
+    def params0(self) -> Context | None:
+        return None if self.params0_text is None else\
+            Context(deep = True, **eval(self.params0_text))
+    def save_params0(self, params0: Context | None = None) -> None:
         if params0 is None: self.params0_text = None
-        else: self.params0_text = repr(params0)
-    def params1(self) -> dict[str, object]:
-        return None if self.params1_text is None else eval(self.params1_text)
-    def save_params1(self, params1: dict[str, object] | None = None) -> None:
+        else: self.params0_text = repr(params0.to_dict_deep())
+    def params1(self) -> Context | None:
+        return None if self.params1_text is None else\
+            Context(deep = True, **eval(self.params1_text))
+    def save_params1(self, params1: Context | None = None) -> None:
         if params1 is None: self.params1_text = None
-        else: self.params1_text = repr(params1)
+        else: self.params1_text = repr(params1.to_dict_deep())
     def save_configuration(self, context: Context, commit_ornot: bool = True) -> bool:
         saved0_ornot = Configuration.save_configuration(
             Configuration.CONF_TYPE.SCHEMA_PARAMS_0, self.params0_text,
@@ -32,7 +34,7 @@ class DBSchemaParams(object):
         saved1_ornot = Configuration.save_configuration(
             Configuration.CONF_TYPE.SCHEMA_PARAMS_1, self.params1_text,
             context, commit_ornot = False)
-        if commit_ornot: context.sessions['default'].commit()
+        if commit_ornot: context.default.session.commit()
         return saved0_ornot and saved1_ornot
 
 class _AutoOperations(object):
@@ -259,4 +261,4 @@ class Migration(object):
     def _smart_save(self, context: Context) -> None:
         self.params_record.save_configuration(context, commit_ornot = False)
         DBSchemaVersion.save_default_dict(context, self.version_records, commit_ornot = False)
-        context.sessions['default'].commit()
+        context.default.session.commit()

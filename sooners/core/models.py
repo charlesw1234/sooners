@@ -10,6 +10,7 @@ from ..db.basemodel import intpk, BaseModel
 
 MAX_CONFIGURATION_PART = 64
 MAX_COMPONENT_NAME = 64
+MAX_TABLE_NAME = 64
 MAX_OPERATED_NAME = 64
 MAX_BATCH_SUFFIX = 32
 
@@ -22,24 +23,24 @@ class Configuration(BaseModel):
     conf_part: Mapped[str] = mapped_column(String(MAX_CONFIGURATION_PART))
     @classmethod
     def load_configuration(cls, conf_type: CONF_TYPE, context: Context) -> str:
-        context.inspectors['default'].clear_cache()
-        if not context.inspectors['default'].has_table(cls.__tablename__): return None
+        context.default.inspector.clear_cache()
+        if not context.default.inspector.has_table(cls.__tablename__): return None
         try:
-            records = context.sessions['default'].query(
+            records = context.default.session.query(
                 cls).filter_by(conf_type = conf_type).order_by('conf_part_order')
             return ''.join(map(lambda record: record.conf_part, records))
         except NoResultFound as exc: return None
     @classmethod
     def save_configuration(cls, conf_type: CONF_TYPE, conf: str | None, context: Context,
                            operate_ornot: bool = True, commit_ornot: bool = True) -> bool:
-        context.inspectors['default'].clear_cache()
-        if not context.inspectors['default'].has_table(cls.__tablename__): return False
+        context.default.inspector.clear_cache()
+        if not context.default.inspector.has_table(cls.__tablename__): return False
         if conf is None: conf_parts = ()
         else: conf_parts = tuple(map(
                 lambda start: conf[start: start + MAX_CONFIGURATION_PART],
                 range(0, len(conf), MAX_CONFIGURATION_PART)))
         insert_record_dict, update_record_dict, delete_record_dict = dict(), dict(), dict()
-        for record in context.sessions['default'].query(cls).filter_by(conf_type = conf_type):
+        for record in context.default.session.query(cls).filter_by(conf_type = conf_type):
             if record.conf_part_order < len(conf_parts):
                 update_record_dict[record.conf_part_order] = record
             else: delete_record_dict[record.conf_part_order] = record
@@ -51,18 +52,18 @@ class Configuration(BaseModel):
                 conf_part = conf_part)
         if operate_ornot:
             for record in insert_record_dict.values():
-                context.sessions['default'].add(record)
+                context.default.session.add(record)
             for record in update_record_dict.values():
                 record.body_part = conf_parts[record.conf_part_order]
             for record in delete_record_dict.values():
-                context.sessions['default'].delete(record)
-        if commit_ornot: context.sessions['default'].commit()
+                context.default.session.delete(record)
+        if commit_ornot: context.default.session.commit()
         return True
 
 class _AutoVersion(object):
     def __init__(self, context: Context) -> None:
-        self.session = context.sessions['default']
-        self.inspector = context.inspectors['default']
+        self.session = context.default.session
+        self.inspector = context.default.inspector
     def __call__(self, component_name: str):
         self.inspector.clear_cache()
         cndict = dict(component_name = component_name)
@@ -75,21 +76,21 @@ class DBSchemaVersion(BaseModel):
     @classmethod
     def load_default_dict(cls, context: Context) -> DefaultDict:
         version_records = DefaultDict(_AutoVersion(context))
-        context.inspectors['default'].clear_cache()
-        if not context.inspectors['default'].has_table(cls.__tablename__): pass
+        context.default.inspector.clear_cache()
+        if not context.default.inspector.has_table(cls.__tablename__): pass
         else:
-            for version_record in context.sessions['default'].query(cls).all():
+            for version_record in context.default.session.query(cls).all():
                 version_records[version_record.component_name] = version_record
         return version_records
     @classmethod
     def save_default_dict(cls, context: Context, version_records: DefaultDict,
                           commit_ornot: bool = True) -> bool:
-        context.inspectors['default'].clear_cache()
-        if not context.inspectors['default'].has_table(cls.__tablename__): return False
+        context.default.inspector.clear_cache()
+        if not context.default.inspector.has_table(cls.__tablename__): return False
         for version_record in version_records.values():
             if not inspect(version_record).transient: pass
-            context.sessions['default'].add(version_record)
-        if commit_ornot: context.sessions['default'].commit()
+            context.default.session.add(version_record)
+        if commit_ornot: context.default.session.commit()
         return True
     __tablename__ = 'sooners_dbschema_version'
     component_name: Mapped[str] = mapped_column(String(MAX_COMPONENT_NAME), primary_key = True)
@@ -152,20 +153,24 @@ class DBSchemaOperation(BaseModel):
     def new_by_operation(cls, component_name: str, operation):
         names = operation.names()
         return cls(component_name = component_name, typeid = operation.typeid,
-                   name0 = names[0], name1 = names[1])
+                   table = operation.table_name(), name0 = names[0], name1 = names[1])
     __tablename__ = 'sooners_dbschema_operation'
     __database_name_patterns__ = ('*',)
     id: Mapped[intpk]
     component_name: Mapped[str] = mapped_column(String(MAX_COMPONENT_NAME))
     typeid: Mapped[int] = mapped_column(Integer())
+    table: Mapped[str] = mapped_column(String(MAX_TABLE_NAME), nullable = True)
     name0: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME), nullable = True)
     name1: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME), nullable = True)
-    def key(self): return (self.typeid, self.name0, self.name1)
+    def key(self): return (self.typeid, self.table, self.name0, self.name1)
     def __repr__(self) -> str:
         from ..db.operations import OperationMeta
-        return '%s(%s@%s,%r->%r)' % (self.__class__.__name__,
-                                     OperationMeta.typeid2class[self.typeid].oper_member,
-                                     self.component_name, self.name0, self.name1)
+        if self.table is None: last_part = '%s->%s' % (self.name0, self.name1)
+        else: last_part = '%s(%s->%s)' % (self.table, self.name0, self.name1)
+        return '%s(%s@%s,%s)' % (
+            self.__class__.__name__,
+            OperationMeta.typeid2class[self.typeid].oper_member,
+            self.component_name, last_part)
 
 class BatchWeight(BaseModel):
     __tablename__ = 'sooners_batch_weight'

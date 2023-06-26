@@ -12,7 +12,7 @@ class Command(BaseCommand):
         parser.add_argument('version1', type = int)
 
     def handle(self, namespace: Namespace) -> None:
-        from ..db.metadata import make_patch
+        from ...db.metadata import make_patch
         super().handle(namespace)
         component = self.settings.components[namespace.component]
         xmlpatch = make_patch(component.version_parse(namespace.version0),

@@ -31,6 +31,27 @@ class DatabaseMap(SettingsMap):
                                       dbhost, dbport, default_db)
         return super().install(database, database)
 
+class MigrateContextDefault(object):
+    def __init__(self, context: Context, default_database_name: str) -> None:
+        self.context, self.default_database_name = context, default_database_name
+    def __repr__(self) -> str:
+        parts = []
+        if self.default_database_name in self.context.inspectors: parts.append('inspector')
+        if self.default_database_name in self.context.operators: parts.append('operators')
+        if self.default_database_name in self.context.sessions: parts.append('sessions')
+        if not parts: return '%s(%s)' % (self.__class__.__name__, self.default_database_name)
+        return '%s(%s:%s)' % (
+            self.__class__.__name__, self.default_database_name, ','.join(parts))
+    @property
+    def inspector(self):
+        return self.context.inspectors[self.default_database_name]
+    @property
+    def operator(self):
+        return self.context.operators[self.default_database_name]
+    @property
+    def session(self):
+        return self.context.sessions[self.default_database_name]
+
 class SettingsModelMixin(object):
     def model_setup(self) -> None:
         self._model_params = Context()
@@ -39,7 +60,6 @@ class SettingsModelMixin(object):
         from ..db.registry import Registry
         self._metadata = MetaData(self)
         self._registry = Registry(metadata = self._metadata)
-        #self.load_models()
 
     @property
     def model_params(self):
@@ -52,15 +72,16 @@ class SettingsModelMixin(object):
         return self._databases
 
     @property
-    def default_database_names(self) -> set[str]:
-        if not hasattr(self, '_default_database_names'):
+    def default_database_name(self) -> str:
+        if not hasattr(self, '_default_database_name'):
             func0 = lambda database: database.default_db
             func1 = lambda database: database.name
-            self._default_database_names = set(
+            default_database_names = tuple(
                 map(func1, filter(func0, self.databases.values())))
             # only one default database is permitted.
-            assert(len(self._default_database_names) == 1)
-        return self._default_database_names
+            assert(len(default_database_names) == 1)
+            self._default_database_name = default_database_names[0]
+        return self._default_database_name
 
     @property
     def metadata(self):
@@ -73,8 +94,10 @@ class SettingsModelMixin(object):
         return self._registry
 
     def load_models(self):
-        for component in self.components.values(): component.load_models(self)
-        self.metadata.models.setup(self.model_params, self.databases)
+        if not hasattr(self, '_load_models_done'):
+            self._load_models_done = True
+            for component in self.components.values(): component.load_models(self)
+            self.metadata.models.setup(self.model_params, self.databases)
         return self
 
     def make_migrate_context(self, **kwargs: dict[str, object]) -> Context:
@@ -84,7 +107,9 @@ class SettingsModelMixin(object):
         inspector_func = lambda dbname: inspect(func(dbname).engine_sync)
         operator_func = lambda dbname: func(dbname).patch_oper()
         session_func = lambda dbname: sessionmaker(bind = func(dbname).engine_sync)()
-        return Context(settings = self, **kwargs,
-                       inspectors = DefaultDict(inspector_func),
-                       operators = DefaultDict(operator_func),
-                       sessions = DefaultDict(session_func))
+        context = Context(settings = self, **kwargs, default = None,
+                          inspectors = DefaultDict(inspector_func),
+                          operators = DefaultDict(operator_func),
+                          sessions = DefaultDict(session_func))
+        context.default = MigrateContextDefault(context, self.default_database_name)
+        return context

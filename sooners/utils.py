@@ -3,6 +3,7 @@ from collections import OrderedDict
 from datetime import date, datetime, timedelta
 from hashlib import sha3_384
 from pathlib import Path
+from typing import Iterable
 from xml.dom.minidom import Element
 
 class Hasher(object):
@@ -14,31 +15,42 @@ class Hasher(object):
         return urlsafe_b64encode(self.hasher.digest()).decode('ascii')
 
 class Context(object):
-    def __init__(self, **name2values: dict[str, object]) -> None:
+    def __init__(self, deep = False, **name2values: OrderedDict[str, object]) -> None:
         self.__names__ = list()
-        self.update(**name2values)
+        if not deep: self.update(**name2values)
+        else:
+            func = lambda n2v: n2v if not isinstance(n2v[1], OrderedDict)\
+                else (n2v[0], Context(deep = True, **n2v[1]))
+            self.update(**dict(map(func, name2values.items())))
     def __bool__(self) -> bool: return bool(self.__names__)
     def __repr__(self) -> str:
         return '%s(%s)' % (self.__class__.__name__, ', '.join(
-            map(lambda name: '%s=%r' % (name, getattr(self, name)),
-                sorted(self.__names__))))
-    def update(self, **name2values):
+            map(lambda name: '%s=%r' % (name, getattr(self, name)), self.__names__)))
+    def get_one(self, name: str, default: object = None):
+        return default if name not in self.__names__ else getattr(self, name)
+    def items(self) -> Iterable[tuple[str, object]]:
+        for name in self.__names__: yield (name, getattr(self, name))
+    def set_one(self, name: str, value: object):
+        if name not in self.__names__: self.__names__.append(name)
+        setattr(self, name, value)
+        return self
+    def update(self, **name2values: OrderedDict[str, object]):
         assert(all(map(lambda name: not hasattr(self, name), name2values.keys())))
         assert(all(map(lambda name: name not in self.__names__, name2values.keys())))
-        for name, value in name2values.items(): setattr(self, name, value)
         self.__names__.extend(name2values.keys())
+        for name, value in name2values.items(): setattr(self, name, value)
         return self
-    def delete(self, *names):
+    def delete(self, *names: tuple[str]):
         for name in names: delattr(self, name)
         self.__names__ = list(filter(lambda name: name not in names, self.__names__))
         return self
-    def to_dict(self) -> dict[str, object]:
-        return dict(map(lambda name: (name, getattr(self, name)), self.__names__))
-    def to_dict_deep(self) -> dict[str, object]:
+    def to_dict(self) -> OrderedDict[str, object]:
+        return OrderedDict(map(lambda name: (name, getattr(self, name)), self.__names__))
+    def to_dict_deep(self) -> OrderedDict[str, object]:
         func0 = lambda name: (name, getattr(self, name))
         func1 = lambda nv: (nv[0], nv[1] if not isinstance(nv[1], self.__class__)
                             else nv[1].to_dict_deep())
-        return dict(map(func1, map(func0, self.__names__)))
+        return OrderedDict(map(func1, map(func0, self.__names__)))
 
 class SmartContext(object):
     date_format, at_format = '%Y/%m/%d', '%Y/%m/%d-%H:%M:%S'
