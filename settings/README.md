@@ -1,10 +1,10 @@
 For devel settings
-------------------
+==================
 
 To run the test with devel settings, the following databases have to be setupped.
 
 For PostgreSQL
-==============
+--------------
 
 To setup PostgreSQL user and database:
 ```bash
@@ -26,7 +26,7 @@ postgres=# DROP USER sooners;
 ```
 
 For MySQL
-=========
+---------
 
 To setup MySQL user and database:
 ```bash
@@ -48,6 +48,6 @@ mysql> DROP USER sooners;
 ```
 
 For SQlite3
-===========
+-----------
 
 As tested, sqlite-3.7.2 which used as default version by Ubuntu22.04 is required.
