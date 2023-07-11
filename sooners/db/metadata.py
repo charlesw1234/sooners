@@ -6,7 +6,7 @@ from ..component import BaseComponent
 from .database import BaseDatabase
 from .mixins import Doubt, SNBaseMixin, SNVersionMixin, SNPatchMixin
 from .operations import BaseOperation, CreateTable, DropTable
-from .table import Table, BatchTable
+from .table import Table, ShardTable
 
 class BaseMetaData(SAMetaData, SNVersionMixin, SNPatchMixin):
     __sub_version_types__ = dict()
@@ -15,7 +15,7 @@ class BaseMetaData(SAMetaData, SNVersionMixin, SNPatchMixin):
     def __init__(self, settings, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.settings = settings
-BaseMetaData.register_subtypes(Table, BatchTable)
+BaseMetaData.register_subtypes(Table, ShardTable)
 
 def make_patch(xmlversion0: Element, xmlversion1: Element, prompt: callable) -> Element:
     xmlpatch = getDOMImplementation().createDocument(None, 'Patch', None).documentElement
@@ -66,14 +66,14 @@ class MetaDataSaved(BaseMetaData):
 class ModelCatalogue(object):
     def __init__(self) -> None:
         self.plain_abstract, self.plain = dict(), dict()
-        self.batch_abstract, self.batch, self.batch_entity = dict(), dict(), dict()
+        self.shard_abstract, self.shard, self.shard_entity = dict(), dict(), dict()
     def __repr__(self) -> str:
         return '%s(%s)' % (self.__class__.__name__, ', '.join(
             map(lambda name: '%s: %r' % (name, tuple(getattr(self, name).keys())),
-                ('plain_abstract', 'plain', 'batch_abstract', 'batch', 'batch_entity'))))
+                ('plain_abstract', 'plain', 'shard_abstract', 'shard', 'shard_entity'))))
     def traverse(self) -> Iterable:
-        for model_dict in (self.plain_abstract, self.batch_abstract,
-                           self.plain, self.batch, self.batch_entity):
+        for model_dict in (self.plain_abstract, self.shard_abstract,
+                           self.plain, self.shard, self.shard_entity):
             for name, model in model_dict.items():
                 yield name, model
     def setup(self, params: Context, databases: dict[str, BaseDatabase]) -> None:
@@ -113,5 +113,5 @@ class MetaData(BaseMetaData):
                          **kwargs) -> tuple[SNBaseMixin]:
         if component is None: func0 = lambda table: True
         else: func0 = lambda table: table.__component__ is component
-        func1 = lambda table: getattr(table, '__batch_suffix__', None) is None
+        func1 = lambda table: getattr(table, '__shard_suffix__', None) is None
         return tuple(filter(func1, filter(func0, self.sorted_tables)))

@@ -33,10 +33,5 @@ class DBSchemaStep(BaseMilestoneStep):
             yield delayed_operation
 
     def _do_migrate(self, context: Context, migration: Migration) -> Iterable[BaseOperation]:
-        forward, backward = migration.direction()
-        if forward and backward:
-            raise self.exctype('Can be forward and backward in the same time.')
-        if forward: member = migration.do_operations_forward
-        elif backward: member = migration.do_operations_backward
-        else: return
+        member = migration.direction_member(self.exctype)
         for delayed_operation in member(context): yield delayed_operation

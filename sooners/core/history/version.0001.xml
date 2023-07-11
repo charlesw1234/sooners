@@ -1,10 +1,5 @@
 <?xml version="1.0" ?>
-<MetaData checksum="94OzyiWAwbCFrpacLuHW9jPjSVK3gjyQ4cqKkQaum8TQ5aTARCMj3NlLCiBR1Jkq" sooners="sooners-00.00" component="sooners_core" version="0001">
-  <Table name="sooners_batch_weight">
-    <Column name="batch_name" type="String" length="64" primary_key="True"/>
-    <Column name="batch_suffix" type="String" length="32" nullable="False"/>
-    <Column name="weight" type="BigInteger" nullable="False"/>
-  </Table>
+<MetaData checksum="zQRWbjq7q2iMpaV1xLgTWgHRno95NXOKryOBwFWbBJ6F-PUHt9n1UcXar1BtGEkS" sooners="sooners-00.00" component="sooners_core" version="0001">
   <Table name="sooners_configuration">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="conf_type" type="Enum" enum_name="sooners_conf_type" nullable="False">
@@ -14,14 +9,6 @@
     <Column name="conf_part_order" type="Integer" nullable="False"/>
     <Column name="conf_part" type="String" length="64" nullable="False"/>
   </Table>
-  <Table name="sooners_dbschema_operation">
-    <Column name="id" type="Integer" primary_key="True"/>
-    <Column name="component_name" type="String" length="64" nullable="False"/>
-    <Column name="typeid" type="Integer" nullable="False"/>
-    <Column name="table" type="String" length="64"/>
-    <Column name="name0" type="String" length="64"/>
-    <Column name="name1" type="String" length="64"/>
-  </Table>
   <Table name="sooners_dbschema_version">
     <Column name="component_name" type="String" length="64" primary_key="True"/>
     <Column name="index0" type="Integer" nullable="False" default="0"/>
@@ -30,5 +17,18 @@
     <Column name="index1" type="Integer" nullable="False" default="0"/>
     <Column name="version1" type="Integer"/>
     <Column name="checksum1" type="String" length="64"/>
+  </Table>
+  <Table name="sooners_dbschema_operation">
+    <Column name="id" type="Integer" primary_key="True"/>
+    <Column name="component_name" type="String" length="64" nullable="False"/>
+    <Column name="typeid" type="Integer" nullable="False"/>
+    <Column name="table" type="String" length="64"/>
+    <Column name="name0" type="String" length="64"/>
+    <Column name="name1" type="String" length="64"/>
+  </Table>
+  <Table name="sooners_shard_weight">
+    <Column name="shard_name" type="String" length="64" primary_key="True"/>
+    <Column name="shard_suffix" type="String" length="32" nullable="False"/>
+    <Column name="weight" type="BigInteger" nullable="False"/>
   </Table>
 </MetaData>

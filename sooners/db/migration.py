@@ -61,10 +61,8 @@ class Migration(object):
 
     def is_clean(self) -> bool:
         if self.params_record.params0_text != self.params_record.params1_text: return False
-        for version_record in self.version_records.values():
-            if version_record.version0 != version_record.version1: return False
-            if version_record.checksum0 != version_record.checksum1: return False
-        return True
+        func = lambda version_record: version_record.is_same()
+        return all(map(func, self.version_records.values()))
 
     def load_metadata0(self, settings) -> MetaDataSaved | None:
         key_func = lambda vrecord: vrecord.index0
@@ -150,8 +148,27 @@ class Migration(object):
         backward_drop = any(map(func, self.version_records.values()))
         return forward_patch or forward_create, backward_patch or backward_drop
 
+    def direction_member(self, exctype: type) -> callable:
+        forward_ornot, backward_ornot = self.direction()
+        if not forward_ornot and not backward_ornot: return self.do_operations_forward
+        elif forward_ornot and not backward_ornot: return self.do_operations_forward
+        elif not forward_ornot and backward_ornot: return self.do_operations_backward
+        else: raise exctype(
+                'Migration direction conflict: %r.' %
+                dict(forward_ornot = forward_ornot, backward_ornot = backward_ornot))
+
+    def direction_revert_member(self, exctype: type) -> callable:
+        forward_ornot, backward_ornot = self.direction()
+        if not forward_ornot and not backward_ornot: return self.do_operations_backward
+        elif forward_ornot and not backward_ornot: return self.do_operations_backward
+        elif not forward_ornot and backward_ornot: return self.do_operations_forward
+        else: raise exctype(
+                'Migration direction conflict: %r.' %
+                dict(forward_ornot = forward_ornot, backward_ornot = backward_ornot))
+
     def do_operations_forward(self, context: Context,
-                              database_names: set[str] = None) -> Iterable[BaseOperation]:
+                              database_names: set[str] | None = None
+                              ) -> Iterable[BaseOperation]:
         for component_name in self.metadata1.components.keys():
             component = context.settings.components[component_name]
             for delayed_operation in self._do_operations_by_component(
@@ -163,7 +180,8 @@ class Migration(object):
         self._finish(context)
 
     def do_operations_backward(self, context: Context,
-                               database_names: set[str] = None) -> Iterable[BaseOperation]:
+                               database_names: set[str] | None = None
+                               ) -> Iterable[BaseOperation]:
         delayed_operations = list()
         for component_name in reversed(self.metadata0.components.keys()):
             component = context.settings.components[component_name]
@@ -177,16 +195,19 @@ class Migration(object):
 
     def _do_operations_by_component(
             self, context: Context, component: BaseComponent,
-            database_names: set[str] = None) -> Iterable[BaseOperation]:
-        # yield the delayed operations to the caller.
-        operations = self._generate_operations(component)
+            database_names: set[str] | None = None) -> Iterable[BaseOperation]:
+        dbname2key2record = DefaultDict(_AutoOperations(component.name, context))
         if database_names is None: func = lambda operation: True
         else: func = lambda operation: operation.database_name in database_names
-        dbname2key2record = DefaultDict(_AutoOperations(component.name, context))
-        for operation in filter(func, operations):
-            if operation.key() in dbname2key2record[operation.database_name]: continue
+        # yield the delayed operations to the caller.
+        for operation in filter(func, self._generate_operations(component)):
+            if not self.do_operation_ornot(operation, dbname2key2record): continue
             elif self._is_delay_operation(operation): yield operation
             else: self._do_operation(context, operation, component, dbname2key2record)
+
+    def do_operation_ornot(self, operation: BaseOperation,
+                           dbname2key2record: DefaultDict) -> bool:
+        return True
 
     def _generate_operations(self, component: BaseComponent) -> tuple[BaseOperation]:
         if self.metadata0 is None: return self.metadata1.do_create(component)
@@ -215,13 +236,22 @@ class Migration(object):
 
     def _do_operation(self, context: Context, operation: BaseOperation,
                       component: BaseComponent, dbname2key2record: DefaultDict) -> None:
-        self._before_operation(context, operation, component, dbname2key2record)
+        if not self._before_operation(context, operation, component, dbname2key2record): return
         operation(context.prompt, context.operators[operation.database_name])
         self._after_operation(context, operation, component, dbname2key2record)
 
     def _before_operation(self, context: Context, operation: BaseOperation,
-                          component: BaseComponent, dbname2key2record: DefaultDict) -> None:
-        pass
+                          component: BaseComponent, dbname2key2record: DefaultDict) -> bool:
+        if not context.debug_schema: return True
+        orders = ('do', 'skip', 'break')
+        if operation.table_name() is None: atstr = operation.database
+        else: atstr = '%s@%s' % (operation.table_name(), operation.database_name)
+        prompt = 'For %r@%s: (%s): ' % (operation, atstr, '/'.join(orders))
+        while True:
+            debug_order = input(prompt).strip()
+            if debug_order == 'do': return True
+            elif debug_order == 'skip': return False
+            elif debug_order == 'break': raise RuntimeError('break by user.')
 
     def _after_operation(self, context: Context, operation: BaseOperation,
                          component: BaseComponent, dbname2key2record: DefaultDict) -> None:

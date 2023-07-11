@@ -18,7 +18,7 @@ class Settings(BaseSettings):
         self.databases.install_mysql('test1', 'sooners', 'sooners', '$abc123def$')
         self.databases.install_sqlite3_at_dbs('test2', 'test2.sqlite3')
         index2suffix = lambda index: '%03u' % index
-        self.model_params.update(Point = Context(batch_map = dict(
+        self.model_params.update(Point = Context(shard_map = dict(
             test0 = tuple(map(index2suffix, range(0, 1))),
             test1 = tuple(map(index2suffix, range(1, 3))),
-            test2 = tuple(map(index2suffix, range(3, 6))))))
+            test2 = tuple(map(index2suffix, range(3, 9))))))

@@ -33,7 +33,8 @@ class BaseOperation(object, metaclass = OperationMeta):
     def names(self) -> tuple[str | None]:
         return (None if len(self.attrs) < 1 else getattr(self, self.attrs[0]).name,
                 None if len(self.attrs) < 2 else getattr(self, self.attrs[1]).name)
-    def key(self) -> tuple[str | int | None]: return (self.typeid, *self.names())
+    def key(self) -> tuple[str | int | None]:
+        return (self.typeid, self.table_name(), *self.names())
 
 
 ColumnDict = dict[str, SAColumn]
@@ -116,12 +117,12 @@ class DropTable(BaseOperation):
 class ColumnOperationMixin(object):
     def table_name(self) -> str | None: return self.column.table.name
 
-class CreateColumn(BaseOperation, ColumnOperationMixin):
+class CreateColumn(ColumnOperationMixin, BaseOperation):
     typeid, oper_member, attrs = 4, 'add_column', ('column',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.column.table.name, self.column)
 
-class AlterColumn(BaseOperation, ColumnOperationMixin):
+class AlterColumn(ColumnOperationMixin, BaseOperation):
     typeid, oper_member, attrs = 5, 'alter_column', ('column0', 'column1')
     def check_arguments(self) -> bool: return bool(self._make_arguments0())
     def make_arguments(self, oper: Arguments) -> Arguments:
@@ -154,7 +155,7 @@ class AlterColumn(BaseOperation, ColumnOperationMixin):
         elif isinstance(oper.impl, PostgresqlImpl): pass
         return arguments.prepend(self.column1.table.name, self.column0.name)
 
-class DropColumn(BaseOperation, ColumnOperationMixin):
+class DropColumn(ColumnOperationMixin, BaseOperation):
     typeid, oper_member, attrs = 6, 'drop_column', ('column',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.column.table.name, self.column.name)
@@ -165,44 +166,44 @@ class DropColumn(BaseOperation, ColumnOperationMixin):
 class ConstraintOperationMixin(object):
     def table_name(self) -> str | None: return self.constraint.table.name
 
-class CreatePrimaryKeyConstraint(BaseOperation, ConstraintOperationMixin):
+class CreatePrimaryKeyConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 7, 'create_primary_key_constraint'
     # fixme.
-class DropPrimaryKeyConstraint(BaseOperation, ConstraintOperationMixin):
+class DropPrimaryKeyConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 8, 'drop_primary_key_constraint'
     # fixme
 
-class CreateForeignKeyConstraint(BaseOperation, ConstraintOperationMixin):
+class CreateForeignKeyConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 9, 'create_foreign_key_constraint'
     # fixme.
-class DropForeignKeyConstraint(BaseOperation, ConstraintOperationMixin):
+class DropForeignKeyConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 10, 'drop_foreign_key_constraint'
     # fixme.
 
-class CreateUniqueConstraint(BaseOperation, ConstraintOperationMixin):
+class CreateUniqueConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 11, 'create_unique_constraint'
     # fixme.
-class DropUniqueConstraint(BaseOperation, ConstraintOperationMixin):
+class DropUniqueConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 12, 'drop_unique_constraint'
     # fixme.
 
-class CreateCheckConstraint(BaseOperation, ConstraintOperationMixin):
+class CreateCheckConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 13, 'create_check_constraint'
     # fixme.
-class DropCheckConstraint(BaseOperation, ConstraintOperationMixin):
+class DropCheckConstraint(ConstraintOperationMixin, BaseOperation):
     typeid, oper_member = 14, 'drop_check_constraint'
     # fixme.
 
 class IndexOperationMixin(object):
     def table_name(self) -> str | None: return self.index.table.name
 
-class CreateIndex(BaseOperation, IndexOperationMixin):
+class CreateIndex(IndexOperationMixin, BaseOperation):
     typeid, oper_member, attrs = 15, 'create_index', ('index',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.index.name, self.index.table.name,
                          self.index.columns, unique = self.index.unique)
 
-class DropIndex(BaseOperation, IndexOperationMixin):
+class DropIndex(IndexOperationMixin, BaseOperation):
     typeid, oper_member, attrs = 16, 'drop_index', ('index',)
     def make_arguments(self, oper: AlembicOperations) -> Arguments:
         return Arguments(self.index.name, self.index.table.name)

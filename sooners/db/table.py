@@ -242,13 +242,24 @@ class BaseTable(SATable, SNVersionMixin, SNPatchMixin):
     __constraint_priority__ = {
         'PrimaryKeyConstraint': 1, 'ForeignKeyConstraint': 2,
         'UniqueConstraint': 3, 'CheckConstraint': 4 }
-    def __new__(cls, *args, database_names: set[str] = None, component = None, **kwargs):
+    def __new__(cls, *args, database_names: set[str] = None,
+                component = None, table_priority = None, **kwargs):
         table = super().__new__(cls, *args, **kwargs)
         table.__database_names__ = database_names
         table.__component__ = component
+        table.__table_priority__ = table_priority
         return table
+    @property
+    def key(self) -> str:
+        if getattr(self, '__table_priority__', None) is None: return super().key
+        if isinstance(self.__table_priority__, str): return self.__table_priority__
+        elif isinstance(self.__table_priority__, int):
+            return 'int.%06u' % self.__table_priority__
+        else: raise ValueError('Unsupported type of __table_priority__(%r) for %r.' %
+                               (self.__table_priority__, self))
+
     def __repr__(self):
-        if self.__database_names__ is None: str_database_names = 'None'
+        if getattr(self, '__database_names__', None) is None: str_database_names = 'None'
         else: str_database_names = '/'.join(sorted(self.__database_names__))
         return '%s(%s@%s)' % (self.__class__.__name__, self.name, str_database_names)
     def show(self): return '%s(%s)' % (repr(self), ', '.join(
@@ -267,7 +278,7 @@ class Table(BaseTable):
     @classmethod
     def new_from_xmlele(cls, xmlele: Element, metadata: SAMetaData) -> Iterable:
         table_name = xmlele.getAttribute('name')
-        database_names = metadata.params.get_one(table_name, {}).get_one(
+        database_names = metadata.params.get_one(table_name, Context()).get_one(
             'database_names', { metadata.settings.default_database_name })
         yield cls(table_name, metadata, database_names = database_names,
                   *cls.load_subobjs_from_xmlele(xmlele, metadata))
@@ -387,16 +398,17 @@ class Table(BaseTable):
         for database_name in sorted(table.__database_names__):
             yield CreateTable(database_name, table)
 
-class BatchTable(BaseTable):
+class ShardTable(BaseTable):
     @classmethod
     def new_from_xmlele(cls, xmlele: Element, metadata: SAMetaData) -> Iterable:
-        batch_name = xmlele.getAttribute('name')
-        dbname2suffixes = metadata.params.get_one(batch_name, {}).get_one('database_names', {})
+        shard_name = xmlele.getAttribute('name')
+        dbname2suffixes = metadata.params.get_one(
+            shard_name, Context()).get_one('database_names', {})
         for dbname, suffixes in dbname2suffixes.items():
-            for batch_suffix in suffixes:
-                yield cls('%s_%s' % (batch_name, batch_suffix),
+            for shard_suffix in suffixes:
+                yield cls('%s_%s' % (shard_name, shard_suffix),
                           metadata, database_names = { dbname },
-                          batch_name = batch_name, batch_suffix = batch_suffix,
+                          shard_name = shard_name, shard_suffix = shard_suffix,
                           *cls.load_subobjs_from_xmlele(xmlele, metadata))
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
@@ -410,31 +422,31 @@ class BatchTable(BaseTable):
         func1 = lambda database_names: database_names is not None
         for dbname in set().union(*filter(func1, map(func0, objgroup))):
             func0 = lambda obj: dbname in obj.__database_names__
-            func1 = lambda obj: obj.__batch_suffix__
+            func1 = lambda obj: obj.__shard_suffix__
             suffixes = sorted(map(func1, filter(func0, objgroup)))
             self_params.database_names[dbname] = suffixes
         if not self_params.database_names: return params
-        return params.set_one(objgroup[0].__batch_name__, self_params)
+        return params.set_one(objgroup[0].__shard_name__, self_params)
 
-    def __new__(cls, *args, batch_name: str | None = None,
-                batch_suffix: str | None = None, **kwargs):
+    def __new__(cls, *args, shard_name: str | None = None,
+                shard_suffix: str | None = None, **kwargs):
         table = super().__new__(cls, *args, **kwargs)
-        table.__batch_name__, table.__batch_suffix__ = batch_name, batch_suffix
+        table.__shard_name__, table.__shard_suffix__ = shard_name, shard_suffix
         return table
     def group_check(self, other) -> bool:
-        return self.__batch_name__ == other.__batch_name__
+        return self.__shard_name__ == other.__shard_name__
 
     @classmethod
     def params_update(cls, xmlversion: Element,
                       metadata0: SAMetaData,
                       metadata1: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlversion.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: (table.__batch_suffix__, table)
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: (table.__shard_suffix__, table)
         tables0 = dict(map(func1, filter(func0, metadata0.tables.values())))
         tables1 = dict(map(func1, filter(func0, metadata1.tables.values())))
-        for batch_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
-            table0, table1 = tables0.get(batch_suffix, None), tables1.get(batch_suffix, None)
+        for shard_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
+            table0, table1 = tables0.get(shard_suffix, None), tables1.get(shard_suffix, None)
             if table0 is not None:
                 assert(len(table0.__database_names__) == 1)
                 database_name0 = tuple(table0.__database_names__)[0]
@@ -454,8 +466,8 @@ class BatchTable(BaseTable):
     def patch_forward_create(cls, xmlpatch: Element,
                              metadata: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: table.__batch_name__ == name
-        func1 = lambda table: table.__batch_suffix__
+        func0 = lambda table: table.__shard_name__ == name
+        func1 = lambda table: table.__shard_suffix__
         for table in sorted(filter(func0, metadata.tables), key = func1):
             for database_name in sorted(table.__database_names__):
                 yield CreateTable(database_name, table)
@@ -464,12 +476,12 @@ class BatchTable(BaseTable):
                       metadata0: SAMetaData,
                       metadata1: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: (table.__batch_suffix__, table)
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: (table.__shard_suffix__, table)
         tables0 = dict(map(func1, filter(func0, metadata0.tables.values())))
         tables1 = dict(map(func1, filter(func0, metadata1.tables.values())))
-        for batch_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
-            table0, table1 = tables0.get(batch_suffix, None), tables1.get(batch_suffix, None)
+        for shard_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
+            table0, table1 = tables0.get(shard_suffix, None), tables1.get(shard_suffix, None)
             if table0 is not None:
                 assert(len(table0.__database_names__) == 1)
                 database_name0 = tuple(table0.__database_names__)[0]
@@ -490,13 +502,13 @@ class BatchTable(BaseTable):
                              metadata0: SAMetaData,
                              metadata1: SAMetaData) -> Iterable[BaseOperation]:
         name0, name1 = xmlpatch.getAttribute('name0'), xmlpatch.getAttribute('name1')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name0
-        func1 = lambda table: (table.__batch_suffix__, table)
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name0
+        func1 = lambda table: (table.__shard_suffix__, table)
         tables0 = dict(map(func1, filter(func0, metadata0.tables.values())))
-        func0 = lambda table: table.__batch_name__ == name1
+        func0 = lambda table: table.__shard_name__ == name1
         tables1 = dict(map(func1, filter(func0, metadata1.tables.values())))
-        for batch_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
-            table0, table1 = tables0.get(batch_suffix, None), tables1.get(batch_suffix, None)
+        for shard_suffix in sorted(set(tables0.keys()) | set(tables1.keys())):
+            table0, table1 = tables0.get(shard_suffix, None), tables1.get(shard_suffix, None)
             if table0 is not None:
                 assert(len(table0.__database_names__) == 1)
                 database_name0 = tuple(table0.__database_names__)[0]
@@ -517,8 +529,8 @@ class BatchTable(BaseTable):
     def patch_forward_drop(cls, xmlpatch: Element,
                            metadata: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: table.__batch_suffix__
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: table.__shard_suffix__
         for table in sorted(filter(func0, metadata.tables), key = func1, reverse = True):
             for database_name in sorted(table.__database_names__, reverse = True):
                 yield DropTable(database_name, table)
@@ -526,8 +538,8 @@ class BatchTable(BaseTable):
     def patch_backward_create(cls, xmlpatch: Element,
                               metadata: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: table.__batch_suffix__
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: table.__shard_suffix__
         for table in sorted(filter(func0, metadata.tables), key = func1, reverse = True):
             for database_name in sorted(table.__database_names__, reverse = True):
                 yield DropTable(database_name, table)
@@ -536,12 +548,12 @@ class BatchTable(BaseTable):
                        metadata1: SAMetaData,
                        metadata0: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: (table.__batch_suffix__, table)
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: (table.__shard_suffix__, table)
         tables1 = dict(map(func1, filter(func0, metadata1.tables.values())))
         tables0 = dict(map(func1, filter(func0, metadata0.tables.values())))
-        for batch_suffix in sorted(set(tables1.keys()) | set(tables0.keys())):
-            table1, table0 = tables1.get(batch_suffix, None), tables0.get(batch_suffix, None)
+        for shard_suffix in sorted(set(tables1.keys()) | set(tables0.keys())):
+            table1, table0 = tables1.get(shard_suffix, None), tables0.get(shard_suffix, None)
             if table1 is not None:
                 assert(len(table1.__database_names__) == 1)
                 database_name1 = tuple(table1.__database_names__)[0]
@@ -562,13 +574,13 @@ class BatchTable(BaseTable):
                               metadata1: SAMetaData,
                               metadata0: SAMetaData) -> Iterable[BaseOperation]:
         name1, name0 = xmlpatch.getAttribute('name1'), xmlpatch.getAttribute('name0')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name1
-        func1 = lambda table: (table.__batch_suffix__, table)
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name1
+        func1 = lambda table: (table.__shard_suffix__, table)
         tables1 = dict(map(func1, filter(func0, metadata1.tables.values())))
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name0
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name0
         tables0 = dict(map(func1, filter(func0, metadata0.tables.values())))
-        for batch_suffix in sorted(set(tables1.keys()) | set(tables0.keys())):
-            table1, table0 = tables1.get(batch_suffix, None), tables0.get(batch_suffix, None)
+        for shard_suffix in sorted(set(tables1.keys()) | set(tables0.keys())):
+            table1, table0 = tables1.get(shard_suffix, None), tables0.get(shard_suffix, None)
             if table1 is not None:
                 assert(len(table1.__database_names__) == 1)
                 database_name1 = tuple(table1.__database_names__)[0]
@@ -589,8 +601,8 @@ class BatchTable(BaseTable):
     def patch_backward_drop(cls, xmlpatch: Element,
                             metadata: SAMetaData) -> Iterable[BaseOperation]:
         name = xmlpatch.getAttribute('name')
-        func0 = lambda table: isinstance(table, cls) and table.__batch_name__ == name
-        func1 = lambda table: table.__batch_suffix__
+        func0 = lambda table: isinstance(table, cls) and table.__shard_name__ == name
+        func1 = lambda table: table.__shard_suffix__
         for table in sorted(filter(func0, metadata.tables), key = func1):
             for database_name in sorted(table.__database_names__):
                 yield CreateTable(database_name, table)

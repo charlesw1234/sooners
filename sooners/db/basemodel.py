@@ -5,7 +5,7 @@ from ..utils import Context
 from ..settings import the_settings
 from .database import BaseDatabase
 from .columntypes import Integer
-from .table import Table, BatchTable
+from .table import Table, ShardTable
 
 intpk = Annotated[int, mapped_column(
     Integer(), primary_key = True, autoincrement = True)]
@@ -39,7 +39,10 @@ class BaseModelMixin(object):
         cls_path = Path(sysmodules[cls.__module__].__file__).absolute()
         component = cls.metadata.settings.components.locate_component(cls_path)
         cls.__component__ = component
-        if hasattr(cls, '__table__'): cls.__table__.__component__ = component
+        if hasattr(cls, '__table__'):
+            cls.__table__.__component__ = component
+            if hasattr(cls, '__table_priority__'):
+                cls.__table__.__table_priority__ = cls.__table_priority__
         return cls
 
 class BaseModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
@@ -63,60 +66,62 @@ class BaseModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
                 cls.__database_name_patterns__))
             cls.__database_names__ = set(filter(func, databases.keys()))
 
-class BaseBatchModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
+class BaseShardModel(DeclarativeBase, BaseModelMixin, metaclass = DeclarativeMeta):
     registry, metadata = the_settings.registry, the_settings.metadata
-    __table_cls__, __abstract__, __batch_suffix__ = BatchTable, True, None
+    __table_cls__, __abstract__, __shard_suffix__ = ShardTable, True, None
     @classmethod
     def post_setup(cls, classdict: dict[str, object], **kwargs) -> type:
         super().post_setup(classdict, **kwargs)
-        if cls.__abstract__: # for abstract batch models.
-            cls.metadata.models.batch_abstract[cls.__name__] = cls
-        elif cls.__batch_suffix__ is None: # for batch models.
-            cls.metadata.models.batch[cls.__name__] = cls
+        if cls.__abstract__: # for abstract shard models.
+            cls.metadata.models.shard_abstract[cls.__name__] = cls
+        elif cls.__shard_suffix__ is None: # for shard models.
+            cls.metadata.models.shard[cls.__name__] = cls
             cls.__suffix2model__ = dict()
             cls.__model2database__ = dict()
             cls.__suffix2database__ = dict()
-        else: # for batch entity models.
-            cls.metadata.models.batch_entity[cls.__name__] = cls
+        else: # for shard entity models.
+            cls.metadata.models.shard_entity[cls.__name__] = cls
         return cls
 
     @classmethod
-    def batch_modelname(cls, batch_suffix: str) -> str:
-        return '%s_%s' % (cls.__name__, batch_suffix)
+    def shard_modelname(cls, shard_suffix: str) -> str:
+        return '%s_%s' % (cls.__name__, shard_suffix)
     @classmethod
-    def batch_tablename(cls, batch_suffix: str) -> str:
-        return '%s_%s' % (cls.__tablename__, batch_suffix)
+    def shard_tablename(cls, shard_suffix: str) -> str:
+        return '%s_%s' % (cls.__tablename__, shard_suffix)
     @classmethod
-    def create_entity_model(cls, database: BaseDatabase, batch_suffix: str) -> None:
-        if batch_suffix in set(cls.__suffix2model__.keys()):
-            excfmt = 'Batch suffix conflict detected for %r at %r.'
-            raise ValueError(excfmt % (cls, batch_suffix))
-        batch_table = cls.__table__.to_metadata(
-            cls.metadata, name = cls.batch_tablename(batch_suffix))
-        batch_table.__class__ = BatchTable
-        batch_table.__batch_name__ = cls.__tablename__
-        batch_table.__batch_suffix__ = batch_suffix
-        batch_entity_model = type(
-            cls.batch_modelname(batch_suffix), cls.__bases__, dict(
-                __batch_name__ = cls.__name__, __batch_suffix__ = batch_suffix,
-                __table__ = batch_table))
-        cls.__suffix2model__[batch_suffix] = batch_entity_model
-        cls.__model2database__[batch_entity_model] = database
-        cls.__suffix2database__[batch_suffix] = database
+    def create_entity_model(cls, database: BaseDatabase, shard_suffix: str) -> None:
+        if shard_suffix in set(cls.__suffix2model__.keys()):
+            excfmt = 'Shard suffix conflict detected for %r at %r.'
+            raise ValueError(excfmt % (cls, shard_suffix))
+        shard_table = cls.__table__.to_metadata(
+            cls.metadata, name = cls.shard_tablename(shard_suffix))
+        shard_table.__class__ = ShardTable
+        shard_table.__shard_name__ = cls.__tablename__
+        shard_table.__shard_suffix__ = shard_suffix
+        if hasattr(cls, '__table_priority__'):
+            shard_table.__table_priority__ = cls.__table_priority__
+        shard_entity_model = type(
+            cls.shard_modelname(shard_suffix), cls.__bases__, dict(
+                __shard_name__ = cls.__name__, __shard_suffix__ = shard_suffix,
+                __table__ = shard_table))
+        cls.__suffix2model__[shard_suffix] = shard_entity_model
+        cls.__model2database__[shard_entity_model] = database
+        cls.__suffix2database__[shard_suffix] = database
     @classmethod
     def setup(cls, params: Context, databases: dict[str, BaseDatabase]) -> None:
         if cls.__abstract__: return
-        if cls.__batch_suffix__ is None: cls.setup_batch(params, databases)
-        else: cls.setup_batch_entity(params, databases)
+        if cls.__shard_suffix__ is None: cls.setup_shard(params, databases)
+        else: cls.setup_shard_entity(params, databases)
     @classmethod
-    def setup_batch(cls, params: Context, databases: dict[str, BaseDatabase]) -> None:
+    def setup_shard(cls, params: Context, databases: dict[str, BaseDatabase]) -> None:
         if cls.__name__ not in params.__names__: return
-        for dbname, suffixes in getattr(params, cls.__name__).batch_map.items():
-            for batch_suffix in suffixes:
-                cls.create_entity_model(databases[dbname], batch_suffix)
+        for dbname, suffixes in getattr(params, cls.__name__).shard_map.items():
+            for shard_suffix in suffixes:
+                cls.create_entity_model(databases[dbname], shard_suffix)
     @classmethod
-    def setup_batch_entity(cls, params: Context, databases: dict[str, BaseDatabase]) -> None:
-        batch_map = getattr(params, cls.__batch_name__).batch_map
-        func0 = lambda dbname2suffixes: cls.__batch_suffix__ in dbname2suffixes[1]
+    def setup_shard_entity(cls, params: Context, databases: dict[str, BaseDatabase]) -> None:
+        shard_map = getattr(params, cls.__shard_name__).shard_map
+        func0 = lambda dbname2suffixes: cls.__shard_suffix__ in dbname2suffixes[1]
         func1 = lambda dbname2suffixes: dbname2suffixes[0]
-        cls.__database_names__ = set(map(func1, filter(func0, batch_map.items())))
+        cls.__database_names__ = set(map(func1, filter(func0, shard_map.items())))

@@ -1,15 +1,15 @@
 <?xml version="1.0" ?>
-<MetaData checksum="QCFQiG21vGCSfQUy8xF8G-6xEfOKSholdHEhRKGhrU_MkDff6_rlqFvkhtuxdaWv" sooners="sooners-00.00" component="sooners_sample1" version="0001">
+<MetaData checksum="5CMG2DvC-u1BYmse6SS4bM8MK_u01jW2n5zSvTZyJ4RzW-atfwGaPcLuX1aAvMCg" sooners="sooners-00.00" component="sooners_sample1" version="0001">
   <Table name="sample1_building">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="name" type="String" length="32" nullable="False"/>
   </Table>
-  <BatchTable name="sample1_point">
+  <ShardTable name="sample1_point">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="name" type="String" length="32" nullable="False"/>
-    <Column name="building_id" type="Integer"/>
-    <Column name="floor_id" type="Integer"/>
-  </BatchTable>
+    <Column name="building_id" type="Integer" nullable="False"/>
+    <Column name="floor_id" type="Integer" nullable="False"/>
+  </ShardTable>
   <Table name="sample1_floor">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="name" type="String" length="32" nullable="False"/>

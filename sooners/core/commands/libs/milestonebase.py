@@ -21,7 +21,8 @@ class BaseMilestoneCommand(BaseCommand):
         else:
             from ....milestone import MilestoneStepPatterns
             context = self.settings.make_migrate_context(
-                milestone = module.milestone, do_action = not namespace.no_action,
+                milestone = module.milestone,
+                do_action = not namespace.no_action,
                 exctype = self.exctype, prompt = self.prompt)
             patterns = MilestoneStepPatterns(namespace.confirm, *namespace.patterns)
             self.sub_handle(module.milestone, patterns, context)

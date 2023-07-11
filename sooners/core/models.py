@@ -12,11 +12,12 @@ MAX_CONFIGURATION_PART = 64
 MAX_COMPONENT_NAME = 64
 MAX_TABLE_NAME = 64
 MAX_OPERATED_NAME = 64
-MAX_BATCH_SUFFIX = 32
+MAX_SHARD_SUFFIX = 32
 
 class Configuration(BaseModel):
     class CONF_TYPE(PyEnum): SCHEMA_PARAMS_0, SCHEMA_PARAMS_1 = 0, 1
     __tablename__ = 'sooners_configuration'
+    __table_args__ = dict(table_priority = 'sooners.0001')
     id: Mapped[intpk]
     conf_type: Mapped[CONF_TYPE] = mapped_column(Enum(CONF_TYPE, name = 'sooners_conf_type'))
     conf_part_order: Mapped[int] = mapped_column(Integer())
@@ -93,6 +94,7 @@ class DBSchemaVersion(BaseModel):
         if commit_ornot: context.default.session.commit()
         return True
     __tablename__ = 'sooners_dbschema_version'
+    __table_args__ = dict(table_priority = 'sooners.0002')
     component_name: Mapped[str] = mapped_column(String(MAX_COMPONENT_NAME), primary_key = True)
     index0: Mapped[int] = mapped_column(
         Integer(), default = 0) # component consequence at version0.
@@ -155,6 +157,7 @@ class DBSchemaOperation(BaseModel):
         return cls(component_name = component_name, typeid = operation.typeid,
                    table = operation.table_name(), name0 = names[0], name1 = names[1])
     __tablename__ = 'sooners_dbschema_operation'
+    __table_args__ = dict(table_priority = 'sooners.0003')
     __database_name_patterns__ = ('*',)
     id: Mapped[intpk]
     component_name: Mapped[str] = mapped_column(String(MAX_COMPONENT_NAME))
@@ -172,11 +175,12 @@ class DBSchemaOperation(BaseModel):
             OperationMeta.typeid2class[self.typeid].oper_member,
             self.component_name, last_part)
 
-class BatchWeight(BaseModel):
-    __tablename__ = 'sooners_batch_weight'
-    batch_name: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME), primary_key = True)
-    batch_suffix: Mapped[str] = mapped_column(String(MAX_BATCH_SUFFIX))
+class ShardWeight(BaseModel):
+    __tablename__ = 'sooners_shard_weight'
+    __table_args__ = dict(table_priority = 'sooners.0004')
+    shard_name: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME), primary_key = True)
+    shard_suffix: Mapped[str] = mapped_column(String(MAX_SHARD_SUFFIX))
     weight: Mapped[int] = mapped_column(BigInteger())
     def __repr__(self) -> str:
         return '%s(%s_%s:%u)' % (self.__class__.__name__,
-                                 self.batch_name, self.batch_suffix, self.weight)
+                                 self.shard_name, self.shard_suffix, self.weight)
