@@ -9,6 +9,7 @@ class BaseMilestoneCommand(BaseCommand):
         parser.add_argument('--show', action = 'store_true')
         parser.add_argument('--confirm', action = 'store_true')
         parser.add_argument('--no-action', action = 'store_true')
+        parser.add_argument('--debug-schema', action = 'store_true')
         parser.add_argument('milestone', type = str)
         parser.add_argument('patterns', nargs = '*', type = str)
 
@@ -23,6 +24,7 @@ class BaseMilestoneCommand(BaseCommand):
             context = self.settings.make_migrate_context(
                 milestone = module.milestone,
                 do_action = not namespace.no_action,
+                debug_schema = namespace.debug_schema,
                 exctype = self.exctype, prompt = self.prompt)
             patterns = MilestoneStepPatterns(namespace.confirm, *namespace.patterns)
             self.sub_handle(module.milestone, patterns, context)
