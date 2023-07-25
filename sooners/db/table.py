@@ -130,11 +130,23 @@ SA2SN.register(Column)
 class PrimaryKeyConstraint(SAPrimaryKeyConstraint, SNVersionMixin, SNPatchMixin):
     @classmethod
     def new_from_xmlele(cls, xmlele: Element, metadata: SAMetaData) -> Iterable:
-        pass # fixme.
+        func0 = lambda subnode: subnode.nodeType is subnode.ELEMENT_NODE
+        func1 = lambda subxmlele: subxmlele.nodeName == 'Column'
+        func2 = lambda subxmlele: subxmlele.getAttribute('name')
+        arguments = Arguments(
+            *map(func2, filter(func1, filter(func0, xmlele.childNodes))),
+            name = xmlele.getAttribute('name'))
+        yield arguments(cls)
     @classmethod
     def save_to_xmlele_open(cls, xmlele: Element,
                             objgroup: tuple[SNBaseMixin], **kwargs) -> None:
         assert(len(objgroup) == 1)
+        primary_key = objgroup[0]
+        xmlele.setAttribute('name', primary_key.name)
+        for column in primary_key.columns:
+            column_xmlele = xmlele.ownerDocument.createElement('Column')
+            column_xmlele.setAttribute('name', column.name)
+            xmlele.appendChild(column_xmlele)
     # add patch_forward_create/patch_forward/patch_forward_rename/patch_forward_drop here.
     # add patch_backward_create/patch_backward/patch_backward_rename/patch_backward_drop here.
 SA2SN.register(PrimaryKeyConstraint)

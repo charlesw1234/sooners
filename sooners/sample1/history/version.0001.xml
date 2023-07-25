@@ -1,14 +1,16 @@
 <?xml version="1.0" ?>
-<MetaData checksum="5CMG2DvC-u1BYmse6SS4bM8MK_u01jW2n5zSvTZyJ4RzW-atfwGaPcLuX1aAvMCg" sooners="sooners-00.00" component="sooners_sample1" version="0001">
+<MetaData checksum="1lFNYaJl1x88INKGW5LeEYj4unzndEc3Go_boE1tvSaAS3HCeM1fuFg0aF7bSYTW" sooners="sooners-00.00" component="sooners_sample1" version="0001">
   <Table name="sample1_building">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="name" type="String" length="32" nullable="False"/>
+    <Column name="point_composite" type="String" length="64"/>
   </Table>
   <ShardTable name="sample1_point">
     <Column name="id" type="Integer" primary_key="True"/>
     <Column name="name" type="String" length="32" nullable="False"/>
     <Column name="building_id" type="Integer" nullable="False"/>
     <Column name="floor_id" type="Integer" nullable="False"/>
+    <Column name="point_type" type="Integer"/>
   </ShardTable>
   <Table name="sample1_floor">
     <Column name="id" type="Integer" primary_key="True"/>

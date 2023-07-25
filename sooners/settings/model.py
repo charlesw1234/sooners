@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Iterable
 from ..utils import Context, DefaultDict, SettingsMap
 
 class DatabaseMap(SettingsMap):
@@ -100,7 +101,28 @@ class SettingsModelMixin(object):
             self.metadata.models.setup(self.model_params, self.databases)
         return self
 
-    def make_migrate_context(self, **kwargs: dict[str, object]) -> Context:
+    def check_models(self) -> Iterable[object]:
+        self.load_models()
+        from ..core.models import DBSchemaVersion
+        context = self.make_db_context()
+        default_dict = DBSchemaVersion.load_default_dict(context)
+        func = lambda version_record: version_record.checksum0 != version_record.checksum1
+        if any(map(func, default_dict.values())): return False
+        for component in self.components.values():
+            if component.name not in default_dict:
+                if self.metadata.make_version(component) is None: pass
+                else: yield component
+            elif default_dict[component.name].checksum0 !=\
+                 default_dict[component.name].checksum1:
+                yield component
+            elif (version_dom := self.metadata.make_version(component)) is None:
+                yield component
+            elif version_dom.getAttribute('checksum') !=\
+                 default_dict[component.name].checksum0:
+                yield component
+            else: pass
+
+    def make_db_context(self, **kwargs: dict[str, object]) -> Context:
         from sqlalchemy import inspect
         from sqlalchemy.orm import sessionmaker
         func = lambda database_name: self.databases[database_name]
@@ -113,3 +135,6 @@ class SettingsModelMixin(object):
                           sessions = DefaultDict(session_func))
         context.default = MigrateContextDefault(context, self.default_database_name)
         return context
+
+    def make_migrate_context(self, **kwargs: dict[str, object]) -> Context:
+        return self.make_db_context(**kwargs)

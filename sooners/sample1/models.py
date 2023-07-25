@@ -8,6 +8,8 @@ from ..db.basemodel import intpk, BaseModel, BaseShardModel
 name_column = Annotated[str, mapped_column(String(32))]
 class Building(BaseModel):
     __tablename__ = 'sample1_building'
+    __shard_root_field__ = 'building_id'
+    __shard_model_names__ = ('Point',)
     id: Mapped[intpk]
     name: Mapped[name_column]
     floors: Mapped[list['Floor']] = relationship(

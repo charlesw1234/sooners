@@ -11,7 +11,7 @@ milestone = Milestone(
                 sample1_point=Context(database_names={
                     'test0': ['000'],
                     'test1': ['001', '002'],
-                    'test2': ['003', '004', '005']}),
+                    'test2': ['003', '004', '005', '006', '007', '008']}),
                 sooners_configuration=Context(database_names={'test0'}),
                 sooners_dbschema_version=Context(database_names={'test0'}),
                 sooners_dbschema_operation=Context(database_names={'test0', 'test1', 'test2'}),

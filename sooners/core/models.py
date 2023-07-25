@@ -6,6 +6,7 @@ from sqlalchemy.exc import NoResultFound
 from ..settings import the_settings
 from ..utils import Hasher, Context, DefaultDict
 from ..db.columntypes import Boolean, BigInteger, Enum, Integer, String, SmallInteger
+from ..db.table import PrimaryKeyConstraint
 from ..db.basemodel import intpk, BaseModel
 
 MAX_CONFIGURATION_PART = 64
@@ -177,10 +178,13 @@ class DBSchemaOperation(BaseModel):
 
 class ShardWeight(BaseModel):
     __tablename__ = 'sooners_shard_weight'
-    __table_args__ = dict(table_priority = 'sooners.0004')
-    shard_name: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME), primary_key = True)
-    shard_suffix: Mapped[str] = mapped_column(String(MAX_SHARD_SUFFIX))
-    weight: Mapped[int] = mapped_column(BigInteger())
+    __table_args__ = (
+        PrimaryKeyConstraint('name', 'suffix', name = 'shard_weight_pk'),
+        dict(table_priority = 'sooners.0004'))
+    name: Mapped[str] = mapped_column(String(MAX_OPERATED_NAME))
+    suffix: Mapped[str] = mapped_column(String(MAX_SHARD_SUFFIX))
+    count: Mapped[int] = mapped_column(BigInteger())
     def __repr__(self) -> str:
-        return '%s(%s_%s:%u)' % (self.__class__.__name__,
-                                 self.shard_name, self.shard_suffix, self.weight)
+        return '%s(%s_%s:%u)' % (self.__class__.__name__, self.name, self.suffix, self.count)
+    def weight(self, max_count: int) -> int:
+        return (max_count - self.count) + 1

@@ -74,3 +74,7 @@ def locate_settings(source_root: Path, sandbox_root: Path,
     global the_settings
     the_settings = settings_class(source_root, sandbox_root, source_version).post_setup()
     return the_settings
+
+def reset_settings(settings: BaseSettings) -> None:
+    global the_settings
+    the_settings = settings
