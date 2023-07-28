@@ -49,8 +49,11 @@ class Command(BaseCommand):
 
     def show(self, namespace: Namespace) -> None:
         if not namespace.show: return
+        prompt_format = '%%%us:%%%us: %%s' % (
+            max(map(lambda route: len(route.__class__.__name__), self.settings.app.routes)),
+            max(map(lambda route: len(route.name), self.settings.app.routes)))
         for route in self.settings.app.routes:
-            self.prompt('%40r(%s, %s)' % (route.__class__, route.name, route.path))
+            self.prompt(prompt_format % (route.__class__.__name__, route.name, route.path))
         if hasattr(self.settings, '_templates'):
             for dirpath in self.settings._templates.env.loader.searchpath:
                 self.prompt('template search path: %r' % dirpath)

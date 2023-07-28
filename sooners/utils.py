@@ -1,10 +1,18 @@
 from base64 import urlsafe_b64encode
 from collections import OrderedDict
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from hashlib import sha3_384
 from pathlib import Path
 from typing import Iterable
 from xml.dom.minidom import Element
+
+@dataclass(repr = False, order = True)
+class ServeVersion():
+    major: int
+    minor: int
+    def __repr__(self) -> str: return 'v-%02u.%02u' % (self.major, self.minor)
+    def __hash__(self) -> int: return hash((self.major, self.minor))
 
 class Hasher(object):
     checksum_class = sha3_384

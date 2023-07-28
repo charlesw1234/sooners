@@ -6,12 +6,18 @@ from ....command import BaseCommand
 class BaseMilestoneCommand(BaseCommand):
     def add_arguments(self, parser: ArgumentParser) -> None:
         super().add_arguments(parser)
-        parser.add_argument('--show', action = 'store_true')
-        parser.add_argument('--confirm', action = 'store_true')
-        parser.add_argument('--no-action', action = 'store_true')
-        parser.add_argument('--debug-schema', action = 'store_true')
+        parser.add_argument('--show', action = 'store_true',
+                            help = 'show the step of the specified milestone')
+        parser.add_argument('--confirm', action = 'store_true',
+                            help = 'confirm before every step')
+        parser.add_argument('--no-action', action = 'store_true',
+                            help = 'just show the planned actions, not do it really')
+        parser.add_argument('--debug-schema', action = 'store_true',
+                            help = 'ask user to do/skip/break before an action started')
         parser.add_argument('milestone', type = str)
-        parser.add_argument('patterns', nargs = '*', type = str)
+        parser.add_argument(
+            'patterns', nargs = '*', type = str,
+            help = 'only the step name matched patterns to be planned to action')
 
     def handle(self, namespace: Namespace) -> None:
         super().handle(namespace)

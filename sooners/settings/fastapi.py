@@ -1,16 +1,23 @@
 #from jose import jwt
-from ..utils import Arguments, DefaultDict
+from ..utils import Arguments, DefaultDict, ServeVersion
 from .baseapi import SettingsBaseAPIMixin
 
 class SettingsFastAPIMixin(SettingsBaseAPIMixin):
     def baseapi_setup(self) -> None:
         super().baseapi_setup()
+        self._serve_versions = { ServeVersion(self.source_version.major,
+                                              self.source_version.minor) }
         self._fastapi_arguments = Arguments()
 
     @property
     def fastapi_arguments(self):
         if not hasattr(self, '_fastapi_arguments'): self.baseapi_setup()
         return self._fastapi_arguments
+
+    @property
+    def serve_versions(self):
+        if not hasattr(self, '_serve_versions'): self.baseapi_setup()
+        return self._serve_versions
 
     @property
     def app(self):
@@ -36,18 +43,12 @@ class SettingsFastAPIMixin(SettingsBaseAPIMixin):
             lambda version: DefaultDict(
                 lambda component_name: APIRouter(
                     prefix = '/%r/%s' % (version, component_name))))
-        default_cn2ar = v2cn2ar[EPVersion(
-            self.source_version.major, self.source_version.minor)]
         for component in self.components.values():
             for epctx in BaseEndpoint.scan_component(component):
-                for version in epctx.klass.get_versions():
-                    if not version.match(self.source_version): pass
-                    elif version.pattern_ornot(): pattern_endpoints.append(epctx)
-                    else: epctx.klass.endpoint_setup(v2cn2ar[version][component.name])
-        for version, cn2ar in v2cn2ar.items():
-            for epctx in pattern_endpoints:
-                for epver in epctx.klass.get_versions():
-                    if epver.pattern_ornot() and epver.match(version):
-                        epctx.klass.endpoint_setup(cn2ar[epctx.component.name])
+                for serve_version in self.serve_versions:
+                    func = lambda endpoint_version: endpoint_version.match(serve_version)
+                    if not any(map(func, epctx.klass.get_versions())): continue
+                    epctx.klass.endpoint_setup(v2cn2ar[serve_version][component.name])
+        for serve_version, cn2ar in v2cn2ar.items():
             for apirouter in cn2ar.values(): self._app.include_router(apirouter)
         return self

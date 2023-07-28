@@ -1,27 +1,36 @@
 from typing import Iterable
 from fastapi.routing import APIRouter
+from .utils import ServeVersion
 from .component import BaseComponentFilePyClass
 
-class EPVersion(object):
-    @classmethod
-    def parse(cls, version_str: str):
-        major_str, minor_str = version_str.split('.')
-        major = None if major_str in ('*', 'xx') else int(major)
-        minor = None if minor_str in ('*', 'xx') else int(minor)
-        return cls(major, minor)
-
-    def __init__(self, major: int | None = None, minor: int | None = None) -> None:
-        self.major, self.minor = major, minor
-    def __hash__(self) -> int: return hash((self.major, self.minor))
+class EPVersionPart(object):
+    def __init__(self, version_part_str: str) -> None:
+        if version_part_str in ('*', 'xx'): self.value, self.oper = None, None
+        elif version_part_str.endswith('+'):
+            self.value, self.oper = int(version_part_str[:-1]), '+'
+        elif version_part_str.endswith('-'):
+            self.value, self.oper = int(version_part_str[:-1]), '-'
+        else: self.value, self.oper = int(version_part_str), '='
     def __repr__(self) -> str:
-        return 'v-%s.%s' % (
-            'xx' if self.major is None else '%02u' % self.major,
-            'xx' if self.minor is None else '%02u' % self.minor)
-    def pattern_ornot(self) -> bool: return None in (self.major, self.minor)
-    def match(self, version) -> bool:
-        if self.major is not None and self.major != version.major: return False
-        if self.minor is not None and self.minor != version.minor: return False
-        return True
+        if self.oper is None: return 'xx'
+        elif self.oper in '=': return '%u' % self.value
+        elif self.oper in '+-': return '%u%s' % (self.value, self.oper)
+        else: raise ValueError('Unsupported EPVersionPart value: (%r, %r).' %
+                               (self.value, self.oper))
+    def match(self, value: int) -> bool:
+        if self.oper is None: return True
+        elif self.oper == '=' and self.value == value: return True
+        elif self.oper == '+' and self.value <= value: return True
+        elif self.oper == '-' and self.value >= value: return True
+        else: return False
+
+class EPVersion(object):
+    def __init__(self, version_str: str = '*.*') -> None:
+        major_str, minor_str = version_str.split('.')
+        self.major, self.minor = EPVersionPart(major_str), EPVersionPart(minor_str)
+    def __repr__(self) -> str: return 'EPVersion(%r.%r)' % (self.major, self.minor)
+    def match(self, version: ServeVersion) -> bool:
+        return self.major.match(version.major) and self.minor.match(version.minor)
 
 class BaseEndpoint(BaseComponentFilePyClass):
     component_filename = 'endpoints'
@@ -32,7 +41,7 @@ class BaseEndpoint(BaseComponentFilePyClass):
     def get_versions(cls) -> Iterable[EPVersion]:
         for version in cls.versions:
             if isinstance(version, EPVersion): yield version
-            elif isinstance(version, str): yield EPVersion.parse(version)
+            elif isinstance(version, str): yield EPVersion(version)
             else: raise ValueError('Invalid version %r encountered.' % version)
 
     @classmethod
